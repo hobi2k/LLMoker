@@ -1,4 +1,8 @@
 ﻿define n = Character(None, kind=nvl)
+define sb = Character("스크립트봇")
+define sys = Character("시스템")
+image poker_bunny = "images/minigames/bunny.png"
+image poker_bunny_result = "images/minigames/bunny2.png"
 
 label start:
     scene black

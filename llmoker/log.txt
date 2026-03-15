@@ -1,4 +1,4 @@
-2026-03-15 16:36:08 UTC
+2026-03-15 16:51:41 UTC
 Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39
 Ren'Py 8.2.1.24030407
 
@@ -6,13 +6,13 @@ Ren'Py 8.2.1.24030407
 1.0
 Built at 2024-03-31 18:24:20 UTC
 
-Early init took 0.03s
-Loading error handling took 0.02s
-Loading script took 0.12s
+Early init took 0.02s
+Loading error handling took 0.01s
+Loading script took 0.04s
 Loading save slot metadata took 0.01s
 Loading persistent took 0.00s
 Set script version to: (8, 2, 1)
-Running init code took 0.04s
+Running init code took 0.02s
 Loading analysis data took 0.01s
 Analyze and compile ATL took 0.00s
 Reloading save slot metadata took 0.01s
@@ -30,10 +30,10 @@ Load screen analysis took 0.00s
 Analyze screens took 0.00s
 Save screen analysis took 0.01s
 Prepare screens took 0.02s
-Save pyanalysis. took 0.01s
+Save pyanalysis. took 0.00s
 Save bytecode. took 0.01s
 Running _start took 0.00s
-Interface start took 0.30s
+Interface start took 0.07s
 
 Initializing gl2 renderer:
 primary display bounds: (0, 0, 1920, 1080)
