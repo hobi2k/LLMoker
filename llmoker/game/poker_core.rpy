@@ -74,6 +74,25 @@ init python:
         ensure_poker_runtime()
         return store._poker_save_store
 
+    def set_poker_bot_mode(bot_mode):
+        """set_poker_bot_mode, 현재 게임의 상대 AI 모드를 변경한다.
+
+        Args:
+            bot_mode: `script_bot` 또는 `llm_npc`.
+
+        Returns:
+            str: 적용 결과 상태 문구.
+        """
+
+        store.poker_bot_mode = bot_mode
+        ensure_backend_config().bot_mode = bot_mode
+        if store._poker_match_runtime is not None:
+            store._poker_match_runtime.set_bot_mode(bot_mode)
+        sync_poker_match_state()
+        if bot_mode == "llm_npc":
+            return "상대 AI를 LLM NPC로 변경했습니다."
+        return "상대 AI를 스크립트봇으로 변경했습니다."
+
     def sync_poker_match_state():
         """sync_poker_match_state, 런타임 매치를 세이브용 스냅샷에 동기화한다.
 

@@ -1,5 +1,5 @@
 ﻿define n = Character(None, kind=nvl)
-define sb = Character("스크립트봇")
+define sb = DynamicCharacter("get_poker_match().bot.name")
 define sys = Character("시스템")
 image poker_bunny = "images/minigames/bunny.png"
 image poker_bunny_result = "images/minigames/bunny2.png"

@@ -2,6 +2,7 @@ import random
 from collections import Counter
 from dataclasses import dataclass, field
 
+from backend.llm_agent import LocalLLMAgent
 from backend.policy_loop import PolicyLoop
 
 
@@ -319,6 +320,8 @@ class PokerMatch:
         self.player = PlayerState(player_name, config.starting_stack)
         self.bot = PlayerState(bot_name, config.starting_stack)
         self.script_bot = SimpleScriptBot()
+        self.llm_agent = LocalLLMAgent(config.local_llm_path, config.llm_runner_python, memory_manager)
+        self.bot_mode = config.bot_mode
         self.hand_no = 0
         self.phase = "finished"
         self.pot = 0
@@ -335,6 +338,8 @@ class PokerMatch:
         self.action_log = []
         self.round_summary = None
         self.latest_feedback = None
+        self.last_llm_reason = ""
+        self._apply_bot_mode_name()
 
     def can_continue_match(self):
         """can_continue_match, 다음 라운드를 시작할 칩이 남아 있는지 확인한다.
@@ -383,6 +388,8 @@ class PokerMatch:
             "action_log": list(self.action_log),
             "round_summary": self.round_summary,
             "latest_feedback": self.latest_feedback,
+            "bot_mode": self.bot_mode,
+            "last_llm_reason": self.last_llm_reason,
         }
 
     @classmethod
@@ -428,6 +435,9 @@ class PokerMatch:
         match.action_log = list(snapshot["action_log"])
         match.round_summary = snapshot["round_summary"]
         match.latest_feedback = snapshot["latest_feedback"]
+        match.bot_mode = snapshot.get("bot_mode", config.bot_mode)
+        match.last_llm_reason = snapshot.get("last_llm_reason", "")
+        match._apply_bot_mode_name()
         return match
 
     def phase_name_ko(self):
@@ -441,6 +451,73 @@ class PokerMatch:
         """
 
         return PHASE_NAMES_KO.get(self.phase, self.phase)
+
+    def _apply_bot_mode_name(self):
+        """_apply_bot_mode_name, 현재 봇 모드에 맞는 표시 이름을 적용한다.
+
+        Args:
+            없음.
+
+        Returns:
+            None: 봇 표시 이름을 갱신한다.
+        """
+
+        if self.bot_mode == "llm_npc":
+            self.bot.name = "사야"
+        else:
+            self.bot.name = "스크립트봇"
+
+    def set_bot_mode(self, bot_mode):
+        """set_bot_mode, 현재 매치에서 사용할 상대 AI 모드를 변경한다.
+
+        Args:
+            bot_mode: `script_bot` 또는 `llm_npc`.
+
+        Returns:
+            None: 봇 모드와 표시 이름을 갱신한다.
+        """
+
+        self.bot_mode = bot_mode
+        self.config.bot_mode = bot_mode
+        self._apply_bot_mode_name()
+
+    def get_bot_mode_label(self):
+        """get_bot_mode_label, 현재 상대 AI 모드의 표시명을 반환한다.
+
+        Args:
+            없음.
+
+        Returns:
+            str: UI에 표시할 상대 AI 모드 문자열.
+        """
+
+        if self.bot_mode == "llm_npc":
+            return "LLM NPC"
+        return "스크립트봇"
+
+    def get_llm_status_text(self):
+        """get_llm_status_text, 현재 LLM 워커 상태 설명을 반환한다.
+
+        Args:
+            없음.
+
+        Returns:
+            str: LLM 상태 문자열.
+        """
+
+        return self.llm_agent.last_status
+
+    def format_bot_hand_for_prompt(self):
+        """format_bot_hand_for_prompt, LLM 프롬프트용 봇 손패 문자열 목록을 반환한다.
+
+        Args:
+            없음.
+
+        Returns:
+            list: 한국어 카드 문자열 목록.
+        """
+
+        return [format_card_ko(card) for card in self.bot.hand]
 
     def start_new_round(self):
         """start_new_round, 새 포커 라운드를 초기화하고 시작 로그를 만든다.
@@ -940,7 +1017,12 @@ class PokerMatch:
         messages = []
         while not self.round_over and self.phase in ("betting1", "betting2") and self.current_actor == "bot":
             actions = self._get_available_actions("bot")
-            if self.current_bet == 0:
+            if self.bot_mode == "llm_npc":
+                llm_choice = self.llm_agent.choose_action(self, actions)
+                bot_action = llm_choice["action"]
+                self.last_llm_reason = llm_choice.get("reason", "")
+                self.action_log.append("%s 선택 사유: %s" % (self.bot.name, self.last_llm_reason))
+            elif self.current_bet == 0:
                 bot_action = self.script_bot.choose_open_action(self.bot.hand, self.phase, self.config.fixed_bet)
             else:
                 bot_action = self.script_bot.choose_response_action(
@@ -950,6 +1032,12 @@ class PokerMatch:
                     "raise" in actions,
                     self.config.fixed_bet,
                 )
+                self.last_llm_reason = ""
+
+            if self.bot_mode != "llm_npc" and self.current_bet == 0:
+                self.last_llm_reason = ""
+            elif self.bot_mode != "llm_npc" and self.current_bet > 0:
+                self.last_llm_reason = ""
 
             if bot_action not in actions:
                 if "call" in actions:

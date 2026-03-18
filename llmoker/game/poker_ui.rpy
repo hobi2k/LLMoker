@@ -63,6 +63,37 @@ screen poker_log_overlay():
             textbutton "닫기":
                 action Hide("poker_log_overlay")
 
+screen poker_settings_overlay():
+    modal True
+
+    frame:
+        xalign 0.5
+        yalign 0.22
+        xmaximum 720
+        padding (22, 22)
+        background "#10141cee"
+
+        vbox:
+            spacing 14
+            text "환경 설정" size 30 color "#ffffff" font "fonts/malgunbd.ttf"
+            text "상대 AI: [get_poker_match().get_bot_mode_label()]" size 22 color "#ffe8a3" font "fonts/malgunbd.ttf"
+            text "모델 경로: [ensure_backend_config().local_llm_path]" size 18 color "#f3f3f3" font "fonts/malgun.ttf" xmaximum 660
+            text "LLM 상태: [get_poker_match().get_llm_status_text()]" size 18 color "#9fd3ff" font "fonts/malgun.ttf" xmaximum 660
+
+            hbox:
+                spacing 12
+                textbutton "스크립트봇 사용":
+                    action SetVariable("poker_status_text", set_poker_bot_mode("script_bot"))
+                textbutton "LLM NPC 사용":
+                    action SetVariable("poker_status_text", set_poker_bot_mode("llm_npc"))
+
+            hbox:
+                spacing 12
+                textbutton "기본 환경 설정":
+                    action ShowMenu("preferences")
+                textbutton "닫기":
+                    action Hide("poker_settings_overlay")
+
 screen poker_table_screen(mode="betting_open"):
     add "images/minigames/bunny.png"
     modal False
@@ -80,6 +111,7 @@ screen poker_table_screen(mode="betting_open"):
             text "팟: [get_poker_match().pot]칩" size 23 color "#f5f5f5" font "fonts/malgun.ttf"
             text "칩 현황" size 20 color "#9fd3ff" font "fonts/malgunbd.ttf"
             text "당신 [get_poker_match().player.stack]칩 / [get_poker_match().bot.name] [get_poker_match().bot.stack]칩" size 20 color "#f5f5f5" font "fonts/malgun.ttf"
+            text "상대 AI: [get_poker_match().get_bot_mode_label()]" size 19 color "#c7f0d8" font "fonts/malgun.ttf"
             text "현재 족보: [get_poker_match().get_player_hand_name()]" size 21 color "#ffe8a3" font "fonts/malgunbd.ttf"
             if poker_status_text:
                 text "[poker_status_text]" size 18 color "#ffe082" font "fonts/malgunbd.ttf" xmaximum 390
@@ -223,6 +255,6 @@ screen poker_table_screen(mode="betting_open"):
                 textbutton "불러오기":
                     action Show("poker_load_overlay")
                 textbutton "환경 설정":
-                    action ShowMenu("preferences")
+                    action Show("poker_settings_overlay")
                 textbutton "메인 메뉴":
                     action MainMenu(confirm=False)

@@ -198,6 +198,15 @@ cython_debug/
 #  Cursor is an AI-powered code editor. `.cursorignore` specifies files/directories to
 #  exclude from AI features like autocomplete and code analysis. Recommended for sensitive data
 #  refer to https://docs.cursor.com/context/ignore-files
+
+# Model weights/checkpoints
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+checkpoints/
+models/llm/
+weights/
 .cursorignore
 .cursorindexingignore
 
@@ -205,3 +214,15 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# LLMoker runtime
+llmoker/game/cache/
+llmoker/game/saves/
+llmoker/game/*.rpyc
+llmoker/log.txt
+llmoker/traceback.txt
+llmoker/data/replays/*.jsonl
+llmoker/data/memory/**/*.jsonl
+llmoker/data/**/*.sqlite
+llmoker/data/**/*.sqlite3
+llmoker/data/**/*.db

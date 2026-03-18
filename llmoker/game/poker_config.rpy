@@ -23,6 +23,8 @@ init python:
 
         if store.poker_backend_config is None:
             store.poker_backend_config = load_backend_config(config.basedir)
+            store.poker_backend_config.bot_mode = store.poker_bot_mode
         return store.poker_backend_config
 
 default poker_backend_config = None
+default poker_bot_mode = "script_bot"
