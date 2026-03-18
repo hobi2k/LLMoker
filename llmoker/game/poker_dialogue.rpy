@@ -98,8 +98,60 @@ init python:
 
         return lines
 
+    def _round_result_summary_text(match):
+        """_round_result_summary_text, 라운드 결과를 대사 프롬프트용 요약으로 변환한다.
+
+        Args:
+            match: 현재 포커 매치 객체.
+
+        Returns:
+            str | None: 라운드 결과 요약 문자열.
+        """
+
+        if not match.round_summary:
+            return None
+
+        summary = match.round_summary
+        return "승자: %s / 플레이어 족보: %s / 상대 족보: %s / 팟: %d칩" % (
+            summary["winner"],
+            summary["player_hand_name"],
+            summary["bot_hand_name"],
+            summary["pot"],
+        )
+
+    def _llm_dialogue_lines(event_name, messages=None):
+        """_llm_dialogue_lines, LLM NPC가 생성한 대사를 화면용 튜플 목록으로 만든다.
+
+        Args:
+            event_name: 대사 이벤트 식별자.
+            messages: 직전 행동 로그 문자열 목록.
+
+        Returns:
+            list: `(화자 키, 대사 문자열)` 튜플 목록.
+        """
+
+        match = get_poker_match()
+        if match.bot_mode != "llm_npc":
+            return []
+
+        result_summary = _round_result_summary_text(match)
+        generation = match.llm_agent.generate_dialogue(match, event_name, result_summary=result_summary)
+        dialogue_text = generation.get("text", "").strip()
+        if not dialogue_text:
+            return []
+
+        lines = []
+        for text in [line.strip() for line in dialogue_text.splitlines() if line.strip()]:
+            lines.append(("sb", text))
+
+        if lines:
+            log_line = "[LLM NPC] %s 대사 생성: %s" % (match.bot.name, " / ".join(text for _, text in lines))
+            match.action_log.append(log_line)
+            store.poker_status_text = log_line
+        return lines
+
     def play_dialogue_event(event_name, messages=None):
-        """play_dialogue_event, 이벤트에 맞는 스크립트 대사를 순차적으로 출력한다.
+        """play_dialogue_event, 이벤트에 맞는 대사를 출력하고 실패 시 스크립트 대사로 폴백한다.
 
         Args:
             event_name: 대사 이벤트 식별자.
@@ -109,7 +161,9 @@ init python:
             None: Ren'Py 대사 창에 대사를 출력한다.
         """
 
-        lines = _dialogue_event_lines(event_name, messages)
+        lines = _llm_dialogue_lines(event_name, messages)
+        if not lines:
+            lines = _dialogue_event_lines(event_name, messages)
         if event_name in ("round_end", "match_end"):
             renpy.show("poker_bunny_result")
         else:

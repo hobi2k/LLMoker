@@ -8,13 +8,15 @@ class BackendConfig:
 
     Args:
         ante: 라운드 시작 시 강제로 내는 앤티 금액.
-        fixed_bet: v1에서 사용하는 고정 베팅 금액.
+        fixed_bet: 현재 구현에서 사용하는 고정 베팅 금액.
         starting_stack: 플레이어 시작 칩 수.
         max_discards: 드로우 단계에서 교체 가능한 최대 카드 수.
         max_raises_per_round: 각 베팅 라운드에서 허용하는 최대 레이즈 횟수.
         bot_mode: 현재 사용할 상대 AI 모드.
         local_llm_path: 로컬 LLM 모델 폴더 경로.
         llm_runner_python: 로컬 LLM 워커를 실행할 파이썬 명령어.
+        llm_backend: 로컬 LLM 추론 백엔드.
+        llm_quantization: 로컬 LLM 양자화 방식.
         memory_db_path: 기억 SQLite 파일 경로.
         replay_db_path: 리플레이 SQLite 파일 경로.
         save_db_path: 저장 상태 SQLite 파일 경로.
@@ -28,9 +30,11 @@ class BackendConfig:
     starting_stack: int = 100
     max_discards: int = 3
     max_raises_per_round: int = 3
-    bot_mode: str = "script_bot"
+    bot_mode: str = "llm_npc"
     local_llm_path: str = "./models/llm"
-    llm_runner_python: str = "python3"
+    llm_runner_python: str = "./.venv/bin/python"
+    llm_backend: str = "vllm"
+    llm_quantization: str = "bitsandbytes"
     memory_db_path: str = "./data/memory/memory.sqlite3"
     replay_db_path: str = "./data/replays/replays.sqlite3"
     save_db_path: str = "./data/save/game_state.sqlite3"
@@ -51,7 +55,13 @@ def load_backend_config(base_dir):
         default_model_path = os.path.join(base_dir, "models", "llm")
 
     local_llm_path = os.environ.get("LOCAL_LLM_PATH", default_model_path)
-    llm_runner_python = os.environ.get("LLM_RUNNER_PYTHON", "python3")
+    default_runner_python = os.path.join(base_dir, ".venv", "bin", "python")
+    if not os.path.isfile(default_runner_python):
+        default_runner_python = "python3"
+
+    llm_runner_python = os.environ.get("LLM_RUNNER_PYTHON", default_runner_python)
+    llm_backend = os.environ.get("LLM_BACKEND", "vllm")
+    llm_quantization = os.environ.get("LLM_QUANTIZATION", "bitsandbytes")
     memory_db_path = os.environ.get(
         "MEMORY_DB_PATH",
         os.path.join(base_dir, "data", "memory", "memory.sqlite3"),
@@ -71,9 +81,11 @@ def load_backend_config(base_dir):
         starting_stack=100,
         max_discards=3,
         max_raises_per_round=3,
-        bot_mode="script_bot",
+        bot_mode="llm_npc",
         local_llm_path=local_llm_path,
         llm_runner_python=llm_runner_python,
+        llm_backend=llm_backend,
+        llm_quantization=llm_quantization,
         memory_db_path=memory_db_path,
         replay_db_path=replay_db_path,
         save_db_path=save_db_path,

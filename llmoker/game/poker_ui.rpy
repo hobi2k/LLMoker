@@ -13,7 +13,7 @@ screen poker_save_overlay():
             text "저장" size 28 color "#ffffff" font "fonts/malgunbd.ttf"
             for slot_info in get_poker_save_store().list_slots():
                 textbutton "[slot_info['slot']]번 슬롯 - [slot_info['label']]":
-                    action [SetVariable("poker_status_text", save_poker_slot(slot_info["slot"])), Hide("poker_save_overlay")]
+                    action [Function(save_poker_slot_and_update_status, slot_info["slot"]), Hide("poker_save_overlay")]
             textbutton "닫기":
                 action Hide("poker_save_overlay")
 
@@ -32,7 +32,7 @@ screen poker_load_overlay():
             text "불러오기" size 28 color "#ffffff" font "fonts/malgunbd.ttf"
             for slot_info in get_poker_save_store().list_slots():
                 textbutton "[slot_info['slot']]번 슬롯 - [slot_info['label']]":
-                    action [SetVariable("poker_status_text", load_poker_slot(slot_info["slot"])), Hide("poker_load_overlay")]
+                    action [Function(load_poker_slot_and_update_status, slot_info["slot"]), Hide("poker_load_overlay")]
             textbutton "닫기":
                 action Hide("poker_load_overlay")
 
@@ -77,19 +77,14 @@ screen poker_settings_overlay():
             spacing 14
             text "환경 설정" size 30 color "#ffffff" font "fonts/malgunbd.ttf"
             text "상대 AI: [get_poker_match().get_bot_mode_label()]" size 22 color "#ffe8a3" font "fonts/malgunbd.ttf"
+            text "LLM 백엔드: [get_poker_match().get_llm_backend_label()]" size 20 color "#c7f0d8" font "fonts/malgun.ttf"
             text "모델 경로: [ensure_backend_config().local_llm_path]" size 18 color "#f3f3f3" font "fonts/malgun.ttf" xmaximum 660
             text "LLM 상태: [get_poker_match().get_llm_status_text()]" size 18 color "#9fd3ff" font "fonts/malgun.ttf" xmaximum 660
+            text "상대 AI 변경은 메인 메뉴의 환경 설정에서 할 수 있습니다." size 18 color "#f3f3f3" font "fonts/malgun.ttf" xmaximum 660
 
             hbox:
                 spacing 12
-                textbutton "스크립트봇 사용":
-                    action SetVariable("poker_status_text", set_poker_bot_mode("script_bot"))
-                textbutton "LLM NPC 사용":
-                    action SetVariable("poker_status_text", set_poker_bot_mode("llm_npc"))
-
-            hbox:
-                spacing 12
-                textbutton "기본 환경 설정":
+                textbutton "Ren'Py 환경 설정":
                     action ShowMenu("preferences")
                 textbutton "닫기":
                     action Hide("poker_settings_overlay")

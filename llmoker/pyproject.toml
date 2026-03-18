@@ -1,7 +1,18 @@
 [project]
 name = "llmoker"
 version = "0.1.0"
-description = "Add your description here"
+description = "Ren'Py 기반 5드로우 포커 + 로컬 LLM + memory 프로젝트"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []
+
+[project.optional-dependencies]
+llm = [
+    "accelerate>=0.33",
+    "bitsandbytes>=0.46.1",
+    "torch>=2.3",
+    "torchaudio>=2.3",
+    "transformers==4.57.3",
+    "vllm>=0.11.0",
+    "torchvision>=0.18",
+]

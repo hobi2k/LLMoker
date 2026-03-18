@@ -249,14 +249,14 @@ screen quick_menu():
             xalign 0.5
             yalign 1.0
 
-            textbutton _("Back") action Rollback()
-            textbutton _("History") action ShowMenu('history')
-            textbutton _("Skip") action Skip() alternate Skip(fast=True, confirm=True)
-            textbutton _("Auto") action Preference("auto-forward", "toggle")
-            textbutton _("Save") action ShowMenu('save')
-            textbutton _("Q.Save") action QuickSave()
-            textbutton _("Q.Load") action QuickLoad()
-            textbutton _("Prefs") action ShowMenu('preferences')
+            textbutton "뒤로" action Rollback()
+            textbutton "기록" action ShowMenu('history')
+            textbutton "건너뛰기" action Skip() alternate Skip(fast=True, confirm=True)
+            textbutton "자동" action Preference("auto-forward", "toggle")
+            textbutton "저장" action ShowMenu('save')
+            textbutton "빠른 저장" action QuickSave()
+            textbutton "빠른 불러오기" action QuickLoad()
+            textbutton "환경 설정" action ShowMenu('preferences')
 
 
 ## This code ensures that the quick_menu screen is displayed in-game, whenever
@@ -297,38 +297,38 @@ screen navigation():
 
         if main_menu:
 
-            textbutton _("Start") action Start()
+            textbutton "시작" action Start()
 
         else:
 
-            textbutton _("History") action ShowMenu("history")
+            textbutton "기록" action ShowMenu("history")
 
-            textbutton _("Save") action ShowMenu("save")
+            textbutton "저장" action ShowMenu("save")
 
-        textbutton _("Load") action ShowMenu("load")
+        textbutton "불러오기" action ShowMenu("load")
 
-        textbutton _("Preferences") action ShowMenu("preferences")
+        textbutton "환경 설정" action ShowMenu("preferences")
 
         if _in_replay:
 
-            textbutton _("End Replay") action EndReplay(confirm=True)
+            textbutton "리플레이 종료" action EndReplay(confirm=True)
 
         elif not main_menu:
 
-            textbutton _("Main Menu") action MainMenu()
+            textbutton "메인 메뉴" action MainMenu()
 
-        textbutton _("About") action ShowMenu("about")
+        textbutton "정보" action ShowMenu("about")
 
         if renpy.variant("pc") or (renpy.variant("web") and not renpy.variant("mobile")):
 
             ## Help isn't necessary or relevant to mobile devices.
-            textbutton _("Help") action ShowMenu("help")
+            textbutton "도움말" action ShowMenu("help")
 
         if renpy.variant("pc"):
 
             ## The quit button is banned on iOS and unnecessary on Android and
             ## Web.
-            textbutton _("Quit") action Quit(confirm=not main_menu)
+            textbutton "종료" action Quit(confirm=not main_menu)
 
 
 style navigation_button is gui_button
@@ -550,20 +550,20 @@ screen about():
     ## This use statement includes the game_menu screen inside this one. The
     ## vbox child is then included inside the viewport inside the game_menu
     ## screen.
-    use game_menu(_("About"), scroll="viewport"):
+    use game_menu("정보", scroll="viewport"):
 
         style_prefix "about"
 
         vbox:
 
             label "[config.name!t]"
-            text _("Version [config.version!t]\n")
+            text "버전 [config.version!t]\n"
 
             ## gui.about is usually set in options.rpy.
             if gui.about:
                 text "[gui.about!t]\n"
 
-            text _("Made with {a=https://www.renpy.org/}Ren'Py{/a} [renpy.version_only].\n\n[renpy.license!t]")
+            text "{a=https://www.renpy.org/}Ren'Py{/a} [renpy.version_only] 기반으로 제작되었습니다.\n\n[renpy.license!t]"
 
 
 style about_label is gui_label
@@ -587,19 +587,19 @@ screen save():
 
     tag menu
 
-    use file_slots(_("Save"))
+    use file_slots("저장")
 
 
 screen load():
 
     tag menu
 
-    use file_slots(_("Load"))
+    use file_slots("불러오기")
 
 
 screen file_slots(title):
 
-    default page_name_value = FilePageNameInputValue(pattern=_("Page {}"), auto=_("Automatic saves"), quick=_("Quick saves"))
+    default page_name_value = FilePageNameInputValue(pattern=("페이지 {}"), auto=("자동 저장"), quick=("빠른 저장"))
 
     use game_menu(title):
 
@@ -641,7 +641,7 @@ screen file_slots(title):
 
                         add FileScreenshot(slot) xalign 0.5
 
-                        text FileTime(slot, format=_("{#file_time}%A, %B %d %Y, %H:%M"), empty=_("empty slot")):
+                        text FileTime(slot, format=("{#file_time}%Y-%m-%d %H:%M"), empty=("빈 슬롯")):
                             style "slot_time_text"
 
                         text FileSaveName(slot):
@@ -661,27 +661,27 @@ screen file_slots(title):
 
                     spacing gui.page_spacing
 
-                    textbutton _("<") action FilePagePrevious()
+                    textbutton "이전" action FilePagePrevious()
 
                     if config.has_autosave:
-                        textbutton _("{#auto_page}A") action FilePage("auto")
+                        textbutton "자동" action FilePage("auto")
 
                     if config.has_quicksave:
-                        textbutton _("{#quick_page}Q") action FilePage("quick")
+                        textbutton "빠른 저장" action FilePage("quick")
 
                     ## range(1, 10) gives the numbers from 1 to 9.
                     for page in range(1, 10):
                         textbutton "[page]" action FilePage(page)
 
-                    textbutton _(">") action FilePageNext()
+                    textbutton "다음" action FilePageNext()
 
                 if config.has_sync:
                     if CurrentScreenName() == "save":
-                        textbutton _("Upload Sync"):
+                        textbutton "동기화 업로드":
                             action UploadSync()
                             xalign 0.5
                     else:
-                        textbutton _("Download Sync"):
+                        textbutton "동기화 다운로드":
                             action DownloadSync()
                             xalign 0.5
 
@@ -729,7 +729,7 @@ screen preferences():
 
     tag menu
 
-    use game_menu(_("Preferences"), scroll="viewport"):
+    use game_menu("환경 설정", scroll="viewport"):
 
         vbox:
 
@@ -740,16 +740,31 @@ screen preferences():
 
                     vbox:
                         style_prefix "radio"
-                        label _("Display")
-                        textbutton _("Window") action Preference("display", "window")
-                        textbutton _("Fullscreen") action Preference("display", "fullscreen")
+                        label "화면 모드"
+                        textbutton "창 모드" action Preference("display", "window")
+                        textbutton "전체 화면" action Preference("display", "fullscreen")
 
                 vbox:
                     style_prefix "check"
-                    label _("Skip")
-                    textbutton _("Unseen Text") action Preference("skip", "toggle")
-                    textbutton _("After Choices") action Preference("after choices", "toggle")
-                    textbutton _("Transitions") action InvertSelected(Preference("transitions", "toggle"))
+                    label "건너뛰기"
+                    textbutton "읽지 않은 텍스트 포함" action Preference("skip", "toggle")
+                    textbutton "선택지 이후에도 계속" action Preference("after choices", "toggle")
+                    textbutton "화면 전환 포함" action InvertSelected(Preference("transitions", "toggle"))
+
+                if main_menu:
+                    vbox:
+                        style_prefix "radio"
+                        label "상대 AI"
+                        text "현재 선택: [store.poker_bot_mode == 'llm_npc' and 'LLM NPC' or '스크립트봇']"
+                        textbutton "LLM NPC 사용" action Function(apply_poker_bot_mode, "llm_npc")
+                        textbutton "스크립트봇 사용" action Function(apply_poker_bot_mode, "script_bot")
+
+                    vbox:
+                        style_prefix "radio"
+                        label "LLM 추론 백엔드"
+                        text "현재 선택: [ensure_backend_config().llm_backend == 'vllm' and 'vLLM 4비트' or 'Transformers']"
+                        textbutton "vLLM 4비트 사용" action Function(apply_poker_llm_backend, "vllm", "bitsandbytes")
+                        textbutton "Transformers 사용" action Function(apply_poker_llm_backend, "transformers", "none")
 
                 ## Additional vboxes of type "radio_pref" or "check_pref" can be
                 ## added here, to add additional creator-defined preferences.
@@ -762,46 +777,46 @@ screen preferences():
 
                 vbox:
 
-                    label _("Text Speed")
+                    label "텍스트 속도"
 
                     bar value Preference("text speed")
 
-                    label _("Auto-Forward Time")
+                    label "자동 진행 대기 시간"
 
                     bar value Preference("auto-forward time")
 
                 vbox:
 
                     if config.has_music:
-                        label _("Music Volume")
+                        label "배경음 볼륨"
 
                         hbox:
                             bar value Preference("music volume")
 
                     if config.has_sound:
 
-                        label _("Sound Volume")
+                        label "효과음 볼륨"
 
                         hbox:
                             bar value Preference("sound volume")
 
                             if config.sample_sound:
-                                textbutton _("Test") action Play("sound", config.sample_sound)
+                                textbutton "재생" action Play("sound", config.sample_sound)
 
 
                     if config.has_voice:
-                        label _("Voice Volume")
+                        label "음성 볼륨"
 
                         hbox:
                             bar value Preference("voice volume")
 
                             if config.sample_voice:
-                                textbutton _("Test") action Play("voice", config.sample_voice)
+                                textbutton "재생" action Play("voice", config.sample_voice)
 
                     if config.has_music or config.has_sound or config.has_voice:
                         null height gui.pref_spacing
 
-                        textbutton _("Mute All"):
+                        textbutton "전체 음소거":
                             action Preference("all mute", "toggle")
                             style "mute_all_button"
 
@@ -892,7 +907,7 @@ screen history():
     ## Avoid predicting this screen, as it can be very large.
     predict False
 
-    use game_menu(_("History"), scroll=("vpgrid" if gui.history_height else "viewport"), yinitial=1.0, spacing=gui.history_spacing):
+    use game_menu("기록", scroll=("vpgrid" if gui.history_height else "viewport"), yinitial=1.0, spacing=gui.history_spacing):
 
         style_prefix "history"
 
@@ -920,7 +935,7 @@ screen history():
                     substitute False
 
         if not _history_list:
-            label _("The dialogue history is empty.")
+            label "대화 기록이 비어 있습니다."
 
 
 ## This determines what tags are allowed to be displayed on the history screen.
@@ -979,7 +994,7 @@ screen help():
 
     default device = "keyboard"
 
-    use game_menu(_("Help"), scroll="viewport"):
+    use game_menu("도움말", scroll="viewport"):
 
         style_prefix "help"
 
@@ -988,11 +1003,11 @@ screen help():
 
             hbox:
 
-                textbutton _("Keyboard") action SetScreenVariable("device", "keyboard")
-                textbutton _("Mouse") action SetScreenVariable("device", "mouse")
+                textbutton "키보드" action SetScreenVariable("device", "keyboard")
+                textbutton "마우스" action SetScreenVariable("device", "mouse")
 
                 if GamepadExists():
-                    textbutton _("Gamepad") action SetScreenVariable("device", "gamepad")
+                    textbutton "게임패드" action SetScreenVariable("device", "gamepad")
 
             if device == "keyboard":
                 use keyboard_help
@@ -1005,104 +1020,104 @@ screen help():
 screen keyboard_help():
 
     hbox:
-        label _("Enter")
-        text _("Advances dialogue and activates the interface.")
+        label "Enter"
+        text "대사를 진행하고 인터페이스를 선택합니다."
 
     hbox:
-        label _("Space")
-        text _("Advances dialogue without selecting choices.")
+        label "Space"
+        text "선택지를 누르지 않고 대사만 진행합니다."
 
     hbox:
-        label _("Arrow Keys")
-        text _("Navigate the interface.")
+        label "방향키"
+        text "인터페이스를 이동합니다."
 
     hbox:
-        label _("Escape")
-        text _("Accesses the game menu.")
+        label "Escape"
+        text "게임 메뉴를 엽니다."
 
     hbox:
-        label _("Ctrl")
-        text _("Skips dialogue while held down.")
+        label "Ctrl"
+        text "누르고 있는 동안 대사를 건너뜁니다."
 
     hbox:
-        label _("Tab")
-        text _("Toggles dialogue skipping.")
+        label "Tab"
+        text "대사 건너뛰기를 켜거나 끕니다."
 
     hbox:
-        label _("Page Up")
-        text _("Rolls back to earlier dialogue.")
+        label "Page Up"
+        text "이전 대사로 되돌아갑니다."
 
     hbox:
-        label _("Page Down")
-        text _("Rolls forward to later dialogue.")
+        label "Page Down"
+        text "다음 대사로 앞으로 이동합니다."
 
     hbox:
         label "H"
-        text _("Hides the user interface.")
+        text "사용자 인터페이스를 숨깁니다."
 
     hbox:
         label "S"
-        text _("Takes a screenshot.")
+        text "스크린샷을 저장합니다."
 
     hbox:
         label "V"
-        text _("Toggles assistive {a=https://www.renpy.org/l/voicing}self-voicing{/a}.")
+        text "{a=https://www.renpy.org/l/voicing}셀프 보이스{/a} 기능을 켜거나 끕니다."
 
     hbox:
         label "Shift+A"
-        text _("Opens the accessibility menu.")
+        text "접근성 메뉴를 엽니다."
 
 
 screen mouse_help():
 
     hbox:
-        label _("Left Click")
-        text _("Advances dialogue and activates the interface.")
+        label "왼쪽 클릭"
+        text "대사를 진행하고 인터페이스를 선택합니다."
 
     hbox:
-        label _("Middle Click")
-        text _("Hides the user interface.")
+        label "가운데 클릭"
+        text "사용자 인터페이스를 숨깁니다."
 
     hbox:
-        label _("Right Click")
-        text _("Accesses the game menu.")
+        label "오른쪽 클릭"
+        text "게임 메뉴를 엽니다."
 
     hbox:
-        label _("Mouse Wheel Up")
-        text _("Rolls back to earlier dialogue.")
+        label "휠 위로"
+        text "이전 대사로 되돌아갑니다."
 
     hbox:
-        label _("Mouse Wheel Down")
-        text _("Rolls forward to later dialogue.")
+        label "휠 아래로"
+        text "다음 대사로 앞으로 이동합니다."
 
 
 screen gamepad_help():
 
     hbox:
-        label _("Right Trigger\nA/Bottom Button")
-        text _("Advances dialogue and activates the interface.")
+        label "오른쪽 트리거\nA/아래 버튼"
+        text "대사를 진행하고 인터페이스를 선택합니다."
 
     hbox:
-        label _("Left Trigger\nLeft Shoulder")
-        text _("Rolls back to earlier dialogue.")
+        label "왼쪽 트리거\n왼쪽 숄더"
+        text "이전 대사로 되돌아갑니다."
 
     hbox:
-        label _("Right Shoulder")
-        text _("Rolls forward to later dialogue.")
+        label "오른쪽 숄더"
+        text "다음 대사로 앞으로 이동합니다."
 
     hbox:
-        label _("D-Pad, Sticks")
-        text _("Navigate the interface.")
+        label "방향 패드, 스틱"
+        text "인터페이스를 이동합니다."
 
     hbox:
-        label _("Start, Guide, B/Right Button")
-        text _("Accesses the game menu.")
+        label "시작, 가이드, B/오른쪽 버튼"
+        text "게임 메뉴를 엽니다."
 
     hbox:
-        label _("Y/Top Button")
-        text _("Hides the user interface.")
+        label "Y/위 버튼"
+        text "사용자 인터페이스를 숨깁니다."
 
-    textbutton _("Calibrate") action GamepadCalibrate()
+    textbutton "보정" action GamepadCalibrate()
 
 
 style help_button is gui_button
@@ -1167,8 +1182,8 @@ screen confirm(message, yes_action, no_action):
                 xalign 0.5
                 spacing 150
 
-                textbutton _("Yes") action yes_action
-                textbutton _("No") action no_action
+                textbutton "예" action yes_action
+                textbutton "아니오" action no_action
 
     ## Right-click and escape answer "no".
     key "game_menu" action no_action
@@ -1214,7 +1229,7 @@ screen skip_indicator():
         hbox:
             spacing 9
 
-            text _("Skipping")
+            text "건너뛰는 중"
 
             text "▸" at delayed_blink(0.0, 1.0) style "skip_triangle"
             text "▸" at delayed_blink(0.2, 1.0) style "skip_triangle"
@@ -1523,10 +1538,10 @@ screen quick_menu():
             xalign 0.5
             yalign 1.0
 
-            textbutton _("Back") action Rollback()
-            textbutton _("Skip") action Skip() alternate Skip(fast=True, confirm=True)
-            textbutton _("Auto") action Preference("auto-forward", "toggle")
-            textbutton _("Menu") action ShowMenu()
+            textbutton "뒤로" action Rollback()
+            textbutton "건너뛰기" action Skip() alternate Skip(fast=True, confirm=True)
+            textbutton "자동" action Preference("auto-forward", "toggle")
+            textbutton "메뉴" action ShowMenu()
 
 
 style window:

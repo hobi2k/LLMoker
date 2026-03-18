@@ -27,4 +27,4 @@ init python:
         return store.poker_backend_config
 
 default poker_backend_config = None
-default poker_bot_mode = "script_bot"
+default poker_bot_mode = "llm_npc"

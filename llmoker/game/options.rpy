@@ -30,6 +30,10 @@ define config.version = "1.0"
 ## triple-quotes, and leave a blank line between paragraphs.
 
 define gui.about = _p("""
+LLMoker는 Ren'Py 기반 2인 5드로우 포커 프로젝트입니다.
+
+상대 AI는 메인 메뉴의 환경 설정에서 `LLM NPC`와 `스크립트봇` 사이를 전환할 수 있습니다.
+LLM NPC는 공개된 포커 정보와 기억을 바탕으로 행동과 대사를 생성합니다.
 """)
 
 

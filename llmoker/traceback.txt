@@ -1,85 +1,42 @@
 ﻿I'm sorry, but an uncaught exception occurred.
 
 While running game code:
-  File "game/poker_minigame.rpy", line 45, in script
-    $ next_action = renpy.call_screen("poker_table_screen", mode="round_end")
-  File "game/poker_minigame.rpy", line 45, in script
-    $ next_action = renpy.call_screen("poker_table_screen", mode="round_end")
-  File "game/poker_minigame.rpy", line 45, in <module>
-    $ next_action = renpy.call_screen("poker_table_screen", mode="round_end")
-  File "game/screens.rpy", line 1144, in execute
-    screen confirm(message, yes_action, no_action):
-  File "game/screens.rpy", line 1144, in execute
-    screen confirm(message, yes_action, no_action):
-  File "game/screens.rpy", line 1155, in execute
-    frame:
-  File "game/screens.rpy", line 1157, in execute
-    vbox:
-  File "game/screens.rpy", line 1162, in execute
-    label _(message):
-  File "game/screens.rpy", line 1162, in <module>
-    label _(message):
-TypeError: 'str' object is not callable
+  File "game/poker_minigame.rpy", line 6, in script
+    $ play_dialogue_event("match_intro")
+  File "game/poker_minigame.rpy", line 6, in <module>
+    $ play_dialogue_event("match_intro")
+  File "game/poker_dialogue.rpy", line 164, in play_dialogue_event
+    lines = _llm_dialogue_lines(event_name, messages)
+  File "game/poker_dialogue.rpy", line 138, in _llm_dialogue_lines
+    generation = match.llm_agent.generate_dialogue(match, event_name, result_summary=result_summary)
+IndexError: list index out of range
 
 -- Full Traceback ------------------------------------------------------------
 
 Full traceback:
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/bootstrap.py", line 359, in bootstrap
-    renpy.main.main()
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/main.py", line 635, in main
-    run(restart)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/main.py", line 145, in run
-    renpy.execution.run_context(True)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/execution.py", line 955, in run_context
-    context.run()
-  File "game/poker_minigame.rpy", line 45, in script
-    $ next_action = renpy.call_screen("poker_table_screen", mode="round_end")
-  File "lib/python3.9/future/utils/__init__.py", line 444, in raise_
-  File "game/poker_minigame.rpy", line 45, in script
-    $ next_action = renpy.call_screen("poker_table_screen", mode="round_end")
+  File "game/poker_minigame.rpy", line 6, in script
+    $ play_dialogue_event("match_intro")
   File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/ast.py", line 823, in execute
     renpy.python.py_exec_bytecode(self.code.bytecode, self.hide, store=self.store)
   File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/python.py", line 1178, in py_exec_bytecode
     exec(bytecode, globals, locals)
-  File "game/poker_minigame.rpy", line 45, in <module>
-    $ next_action = renpy.call_screen("poker_table_screen", mode="round_end")
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/exports.py", line 3413, in call_screen
-    rv = renpy.ui.interact(mouse="screen", type="screen", roll_forward=roll_forward)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/ui.py", line 301, in interact
-    rv = renpy.game.interface.interact(roll_forward=roll_forward, **kwargs)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/core.py", line 2165, in interact
-    repeat, rv = self.interact_core(preloads=preloads, trans_pause=trans_pause, pause=pause, pause_start=pause_start, pause_modal=pause_modal, **kwargs) # type: ignore
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/core.py", line 2687, in interact_core
-    root_widget.visit_all(lambda d : d.per_interact())
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/displayable.py", line 431, in visit_all
-    d.visit_all(callback, seen)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/displayable.py", line 431, in visit_all
-    d.visit_all(callback, seen)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/displayable.py", line 431, in visit_all
-    d.visit_all(callback, seen)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/screen.py", line 480, in visit_all
-    callback(self)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/core.py", line 2687, in <lambda>
-    root_widget.visit_all(lambda d : d.per_interact())
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/screen.py", line 491, in per_interact
-    self.update()
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/screen.py", line 697, in update
-    self.screen.function(**self.scope)
-  File "game/screens.rpy", line 1144, in execute
-    screen confirm(message, yes_action, no_action):
-  File "game/screens.rpy", line 1144, in execute
-    screen confirm(message, yes_action, no_action):
-  File "game/screens.rpy", line 1155, in execute
-    frame:
-  File "game/screens.rpy", line 1157, in execute
-    vbox:
-  File "game/screens.rpy", line 1162, in execute
-    label _(message):
-  File "game/screens.rpy", line 1162, in <module>
-    label _(message):
-TypeError: 'str' object is not callable
+  File "game/poker_minigame.rpy", line 6, in <module>
+    $ play_dialogue_event("match_intro")
+  File "game/poker_dialogue.rpy", line 164, in play_dialogue_event
+    lines = _llm_dialogue_lines(event_name, messages)
+  File "game/poker_dialogue.rpy", line 138, in _llm_dialogue_lines
+    generation = match.llm_agent.generate_dialogue(match, event_name, result_summary=result_summary)
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/backend/llm_agent.py", line 259, in generate_dialogue
+    build_public_state_text(match, legal_actions),
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/backend/prompt_builder.py", line 19, in build_public_state_text
+    "현재 족보 추정: %s" % match.get_bot_hand_name(),
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/backend/poker_engine.py", line 614, in get_bot_hand_name
+    return evaluate_hand(self.bot.hand)[2]
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/backend/poker_engine.py", line 161, in evaluate_hand
+    if by_count_then_value[0][1] == 4:
+IndexError: list index out of range
 
 Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39 x86_64
 Ren'Py 8.2.1.24030407
 LLMoker 1.0
-Mon Mar 16 00:59:07 2026
+Thu Mar 19 00:49:15 2026
