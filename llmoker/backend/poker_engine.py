@@ -1,4 +1,5 @@
 import random
+import sys
 from collections import Counter
 from dataclasses import dataclass, field
 
@@ -351,6 +352,18 @@ class PokerMatch:
         self.last_llm_reason = ""
         self._apply_bot_mode_name()
 
+    def _debug_terminal_log(self, message):
+        """_debug_terminal_log, 게임 UI와 분리된 터미널 전용 디버그 로그를 출력한다.
+
+        Args:
+            message: 터미널에 출력할 로그 문자열.
+
+        Returns:
+            None: 표준 에러로 즉시 로그를 출력한다.
+        """
+
+        print("[LLMoker][DEBUG] %s" % message, file=sys.stderr, flush=True)
+
     def can_continue_match(self):
         """can_continue_match, 다음 라운드를 시작할 칩이 남아 있는지 확인한다.
 
@@ -525,7 +538,7 @@ class PokerMatch:
             str: LLM 상태 문자열.
         """
 
-        return self.llm_agent.last_status
+        return self.llm_agent.last_status.replace("{", "{{").replace("}", "}}")
 
     def get_llm_backend_label(self):
         """get_llm_backend_label, 현재 LLM 추론 백엔드 표시명을 반환한다.
@@ -596,6 +609,15 @@ class PokerMatch:
         self.action_log.append(public_start)
         self.public_log.append(public_start)
         self.action_log.append("당신의 시작 손패: %s" % format_cards_ko(self.player.hand))
+        if self.bot_mode == "llm_npc":
+            self._debug_terminal_log(
+                "라운드 %d 시작 / %s 시작 손패: %s (%s)" % (
+                    self.hand_no,
+                    self.bot.name,
+                    format_cards_ko(self.bot.hand),
+                    self.get_bot_hand_name(),
+                )
+            )
         self._start_betting_round("betting1")
         return list(self.action_log)
 
@@ -925,6 +947,14 @@ class PokerMatch:
         self.phase = "finished"
         self.round_over = True
         self._finalize_round_summary(winner_name=winner.name, folded=True)
+        if self.bot_mode == "llm_npc":
+            self._debug_terminal_log("폴드 종료 / 승자: %s / 팟: %d칩 / %s 손패: %s (%s)" % (
+                winner.name,
+                self.pot,
+                self.bot.name,
+                format_cards_ko(self.bot.hand),
+                self.get_bot_hand_name(),
+            ))
 
     def _advance_after_betting(self):
         """_advance_after_betting, 베팅 완료 후 다음 페이즈로 진행한다.
@@ -1081,6 +1111,15 @@ class PokerMatch:
         while not self.round_over and self.phase in ("betting1", "betting2") and self.current_actor == "bot":
             actions = self._get_available_actions("bot")
             if self.bot_mode == "llm_npc":
+                self._debug_terminal_log(
+                    "%s 행동 판단 시작 / 페이즈: %s / 손패: %s (%s) / 허용 행동: %s" % (
+                        self.bot.name,
+                        self.phase_name_ko(),
+                        format_cards_ko(self.bot.hand),
+                        self.get_bot_hand_name(),
+                        ", ".join(actions),
+                    )
+                )
                 llm_choice = self.llm_agent.choose_action(self, actions)
                 bot_action = llm_choice["action"]
                 self.last_llm_reason = llm_choice.get("reason", "")
@@ -1092,6 +1131,14 @@ class PokerMatch:
                 self.action_log.append(llm_log)
                 self.public_log.append(llm_log)
                 messages.append(llm_log)
+                self._debug_terminal_log(
+                    "%s 행동 선택 완료 / 선택: %s / 이유: %s / 상태: %s" % (
+                        self.bot.name,
+                        bot_action,
+                        self.last_llm_reason,
+                        self.llm_agent.last_status,
+                    )
+                )
             elif self.current_bet == 0:
                 bot_action = self.script_bot.choose_open_action(self.bot.hand, self.phase, self.config.fixed_bet)
             else:
@@ -1147,6 +1194,13 @@ class PokerMatch:
             messages.append("당신은 교체 없이 진행했습니다.")
 
         if self.bot_mode == "llm_npc":
+            self._debug_terminal_log(
+                "%s 카드 교체 판단 시작 / 현재 손패: %s (%s)" % (
+                    self.bot.name,
+                    format_cards_ko(self.bot.hand),
+                    self.get_bot_hand_name(),
+                )
+            )
             draw_choice = self.llm_agent.choose_discards(self, self.config.max_discards)
             bot_discards = draw_choice["discard_indexes"]
             llm_draw_log = "[LLM NPC] %s 카드 교체 판단: %s / 이유: %s" % (
@@ -1156,6 +1210,14 @@ class PokerMatch:
             )
             self.action_log.append(llm_draw_log)
             self.public_log.append(llm_draw_log)
+            self._debug_terminal_log(
+                "%s 카드 교체 선택 완료 / 버릴 인덱스: %s / 이유: %s / 상태: %s" % (
+                    self.bot.name,
+                    bot_discards,
+                    draw_choice.get("reason", ""),
+                    self.llm_agent.last_status,
+                )
+            )
         else:
             bot_discards = self.script_bot.choose_discards(self.bot.hand, self.config.max_discards)
         if bot_discards:
@@ -1163,6 +1225,14 @@ class PokerMatch:
             messages.append("%s은(는) %d장의 카드를 교체했습니다." % (self.bot.name, len(bot_discards)))
         else:
             messages.append("%s은(는) 교체 없이 진행했습니다." % self.bot.name)
+        if self.bot_mode == "llm_npc":
+            self._debug_terminal_log(
+                "%s 드로우 후 손패: %s (%s)" % (
+                    self.bot.name,
+                    format_cards_ko(self.bot.hand),
+                    self.get_bot_hand_name(),
+                )
+            )
 
         messages.append("당신의 현재 손패: %s" % format_cards_ko(self.player.hand))
         self.action_log.extend(messages)
@@ -1201,17 +1271,31 @@ class PokerMatch:
             "당신의 손패: %s (%s)" % (format_cards_ko(self.player.hand), player_rank[2]),
             "%s의 손패: %s (%s)" % (self.bot.name, format_cards_ko(self.bot.hand), bot_rank[2]),
         ]
+        if self.bot_mode == "llm_npc":
+            self._debug_terminal_log(
+                "쇼다운 / 플레이어: %s (%s) / %s: %s (%s)" % (
+                    format_cards_ko(self.player.hand),
+                    player_rank[2],
+                    self.bot.name,
+                    format_cards_ko(self.bot.hand),
+                    bot_rank[2],
+                )
+            )
 
         if result == "player":
             self.player.stack += self.pot
             messages.append("당신이 이번 라운드를 가져갔습니다.")
             self.action_log.extend(messages)
             self._finalize_round_summary(self.player.name, folded=False)
+            if self.bot_mode == "llm_npc":
+                self._debug_terminal_log("쇼다운 결과 / 승자: %s / 팟: %d칩" % (self.player.name, self.pot))
         elif result == "bot":
             self.bot.stack += self.pot
             messages.append("%s이(가) 이번 라운드를 가져갔습니다." % self.bot.name)
             self.action_log.extend(messages)
             self._finalize_round_summary(self.bot.name, folded=False)
+            if self.bot_mode == "llm_npc":
+                self._debug_terminal_log("쇼다운 결과 / 승자: %s / 팟: %d칩" % (self.bot.name, self.pot))
         else:
             split = self.pot // 2
             self.player.stack += split
@@ -1219,6 +1303,8 @@ class PokerMatch:
             messages.append("무승부입니다. 팟을 나눠 가집니다.")
             self.action_log.extend(messages)
             self._finalize_round_summary("무승부", folded=False)
+            if self.bot_mode == "llm_npc":
+                self._debug_terminal_log("쇼다운 결과 / 무승부 / 팟: %d칩" % self.pot)
         return messages
 
     def _finalize_round_summary(self, winner_name, folded):

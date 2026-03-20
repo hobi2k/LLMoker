@@ -50,7 +50,7 @@ def load_backend_config(base_dir):
         BackendConfig: 환경 변수와 기본값이 반영된 설정 객체.
     """
 
-    default_model_path = os.path.join(base_dir, "models", "llm", "saya_rp_4b_v3")
+    default_model_path = os.path.join(base_dir, "models", "llm", "qwen3-4b-thinking")    # 필요 사 모델 경로 변경
     if not os.path.isdir(default_model_path):
         default_model_path = os.path.join(base_dir, "models", "llm")
 

@@ -148,6 +148,11 @@ init python:
             log_line = "[LLM NPC] %s 대사 생성: %s" % (match.bot.name, " / ".join(text for _, text in lines))
             match.action_log.append(log_line)
             store.poker_status_text = log_line
+            match._debug_terminal_log("%s 대사 생성 / 이벤트: %s / 내용: %s" % (
+                match.bot.name,
+                event_name,
+                " / ".join(text for _, text in lines),
+            ))
         return lines
 
     def play_dialogue_event(event_name, messages=None):

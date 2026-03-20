@@ -1,3 +1,41 @@
+image poker_table_video_normal = Movie(
+    play="images/minigames/normal.webm",
+    channel="poker_table_video",
+    loop=True,
+)
+
+image poker_table_video_win = Movie(
+    play="images/minigames/win.webm",
+    channel="poker_table_video",
+    loop=True,
+)
+
+image poker_table_video_lost = Movie(
+    play="images/minigames/lost.webm",
+    channel="poker_table_video",
+    loop=True,
+)
+
+init python:
+    def get_poker_table_background_name(mode):
+        """get_poker_table_background_name, 현재 포커 화면 상태에 맞는 배경 영상 이미지를 반환한다.
+
+        Args:
+            mode: 현재 포커 테이블 화면 모드 문자열.
+
+        Returns:
+            str: Ren'Py가 표시할 이미지 이름 문자열.
+        """
+
+        match = get_poker_match()
+        if mode == "round_end" and match.round_summary:
+            winner = match.round_summary.get("winner")
+            if winner == match.player.name:
+                return "poker_table_video_lost"
+            if winner == match.bot.name:
+                return "poker_table_video_win"
+        return "poker_table_video_normal"
+
 screen poker_save_overlay():
     modal True
 
@@ -90,7 +128,7 @@ screen poker_settings_overlay():
                     action Hide("poker_settings_overlay")
 
 screen poker_table_screen(mode="betting_open"):
-    add "images/minigames/bunny.png"
+    add get_poker_table_background_name(mode)
     modal False
 
     frame:

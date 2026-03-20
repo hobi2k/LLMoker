@@ -50,7 +50,6 @@ def load_runtime(model_path, backend_name, quantization):
         llm = LLM(
             model=model_path,
             trust_remote_code=True,
-            device="cuda" if has_cuda else "cpu",
             quantization=quantization if quantization and quantization != "none" else None,
             dtype="bfloat16" if has_cuda else "float32",
             disable_log_stats=True,

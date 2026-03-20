@@ -27,6 +27,10 @@ class LocalLLMAgent:
     _worker_model_path = None
     _worker_backend = None
     _worker_quantization = None
+    _failed_model_path = None
+    _failed_backend = None
+    _failed_quantization = None
+    _failed_reason = None
 
     def __init__(self, local_model_path, runner_python, memory_manager, llm_backend="vllm", llm_quantization="bitsandbytes"):
         self.local_model_path = local_model_path
@@ -59,6 +63,10 @@ class LocalLLMAgent:
         if llm_quantization is not None:
             self.llm_quantization = llm_quantization
         self.shutdown_worker()
+        self.__class__._failed_model_path = None
+        self.__class__._failed_backend = None
+        self.__class__._failed_quantization = None
+        self.__class__._failed_reason = None
 
     def shutdown_worker(self):
         """shutdown_worker, 실행 중인 LLM 워커를 종료한다.
@@ -153,28 +161,36 @@ class LocalLLMAgent:
             self.last_status = "LLM 모델 경로를 찾을 수 없습니다."
             return False
 
+        if (
+            self.__class__._failed_model_path == self.local_model_path
+            and self.__class__._failed_backend == self.llm_backend
+            and self.__class__._failed_quantization == self.llm_quantization
+        ):
+            self.last_status = self.__class__._failed_reason or "이 설정으로는 LLM 워커를 시작할 수 없습니다."
+            return False
+
         process = self.__class__._worker_process
         if (
             process is not None
             and process.poll() is None
             and self.__class__._worker_model_path == self.local_model_path
-            and self.__class__._worker_backend == self.llm_backend
-            and self.__class__._worker_quantization == self.llm_quantization
         ):
             return True
 
         self.shutdown_worker()
         ok, status = self._launch_worker(self.llm_backend, self.llm_quantization)
         if ok:
+            self.__class__._failed_model_path = None
+            self.__class__._failed_backend = None
+            self.__class__._failed_quantization = None
+            self.__class__._failed_reason = None
             self.last_status = status
             return True
 
-        if self.llm_backend == "vllm":
-            fallback_ok, fallback_status = self._launch_worker("transformers", "none")
-            if fallback_ok:
-                self.last_status = "vLLM 4비트를 사용할 수 없어 Transformers로 자동 전환했습니다. 원인: %s" % status
-                return True
-
+        self.__class__._failed_model_path = self.local_model_path
+        self.__class__._failed_backend = self.llm_backend
+        self.__class__._failed_quantization = self.llm_quantization
+        self.__class__._failed_reason = status
         self.last_status = status
         return False
 

@@ -1,4 +1,4 @@
-2026-03-18 16:40:36 UTC
+2026-03-18 17:02:02 UTC
 Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39
 Ren'Py 8.2.1.24030407
 
@@ -7,12 +7,12 @@ Ren'Py 8.2.1.24030407
 Built at 2024-03-31 18:24:20 UTC
 
 Early init took 0.02s
-Loading error handling took 0.02s
-Loading script took 0.14s
-Loading save slot metadata took 0.02s
+Loading error handling took 0.01s
+Loading script took 0.03s
+Loading save slot metadata took 0.01s
 Loading persistent took 0.00s
 Set script version to: (8, 2, 1)
-Running init code took 0.04s
+Running init code took 0.02s
 Loading analysis data took 0.01s
 Analyze and compile ATL took 0.00s
 Reloading save slot metadata took 0.01s
@@ -20,20 +20,20 @@ Index archives took 0.00s
 Dump and make backups took 0.00s
 Cleaning cache took 0.00s
 Making clean stores took 0.00s
-Initial gc took 0.01s
+Initial gc took 0.02s
 DPI scale factor: 1.000000
 Creating interface object took 0.00s
 Cleaning stores took 0.00s
-Init translation took 0.01s
+Init translation took 0.02s
 Build styles took 0.00s
-Load screen analysis took 0.00s
+Load screen analysis took 0.01s
 Analyze screens took 0.00s
-Save screen analysis took 0.01s
-Prepare screens took 0.03s
-Save pyanalysis. took 0.01s
-Save bytecode. took 0.01s
+Save screen analysis took 0.00s
+Prepare screens took 0.02s
+Save pyanalysis. took 0.00s
+Save bytecode. took 0.00s
 Running _start took 0.00s
-Interface start took 0.29s
+Interface start took 0.07s
 
 Initializing gl2 renderer:
 primary display bounds: (0, 0, 1920, 1080)
@@ -45,3 +45,53 @@ Version: b'4.5 (Compatibility Profile) Mesa 25.2.8-0ubuntu0.24.04.1'
 Display Info: None
 Screen sizes: virtual=(1920, 1080) physical=(1739, 978) drawable=(1739, 978)
 Maximum texture size: 4096x4096
+[LLMoker][DEBUG] 라운드 1 시작 / 사야 시작 손패: 하트 King, 스페이드 2, 스페이드 9, 하트 9, 스페이드 3 (원페어)
+
+Full traceback:
+  File "game/poker_minigame.rpy", line 20, in script
+    $ action = renpy.call_screen("poker_table_screen", mode="betting")
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/ast.py", line 823, in execute
+    renpy.python.py_exec_bytecode(self.code.bytecode, self.hide, store=self.store)
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/python.py", line 1178, in py_exec_bytecode
+    exec(bytecode, globals, locals)
+  File "game/poker_minigame.rpy", line 20, in <module>
+    $ action = renpy.call_screen("poker_table_screen", mode="betting")
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/exports.py", line 3413, in call_screen
+    rv = renpy.ui.interact(mouse="screen", type="screen", roll_forward=roll_forward)
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/ui.py", line 301, in interact
+    rv = renpy.game.interface.interact(roll_forward=roll_forward, **kwargs)
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/core.py", line 2165, in interact
+    repeat, rv = self.interact_core(preloads=preloads, trans_pause=trans_pause, pause=pause, pause_start=pause_start, pause_modal=pause_modal, **kwargs) # type: ignore
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/core.py", line 2687, in interact_core
+    root_widget.visit_all(lambda d : d.per_interact())
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/displayable.py", line 431, in visit_all
+    d.visit_all(callback, seen)
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/displayable.py", line 431, in visit_all
+    d.visit_all(callback, seen)
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/displayable.py", line 431, in visit_all
+    d.visit_all(callback, seen)
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/screen.py", line 485, in visit_all
+    self.child.visit_all(callback, seen=None)
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/displayable.py", line 431, in visit_all
+    d.visit_all(callback, seen)
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/displayable.py", line 431, in visit_all
+    d.visit_all(callback, seen)
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/displayable.py", line 431, in visit_all
+    d.visit_all(callback, seen)
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/displayable.py", line 421, in visit_all
+    for d in self.visit():
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/text/text.py", line 1996, in visit
+    self.update()
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/text/text.py", line 1970, in update
+    tokens = self.tokenize(text)
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/text/text.py", line 2450, in tokenize
+    tokens.extend(textsupport.tokenize(i))
+  File "textsupport.pyx", line 147, in renpy.text.textsupport.tokenize
+Exception: Empty text tag in 'LLM 상태: Engine core initialization failed. See root cause above. Failed core proc(s): {}'.
+
+While running game code:
+  File "game/poker_minigame.rpy", line 20, in script
+    $ action = renpy.call_screen("poker_table_screen", mode="betting")
+  File "game/poker_minigame.rpy", line 20, in <module>
+    $ action = renpy.call_screen("poker_table_screen", mode="betting")
+Exception: Empty text tag in 'LLM 상태: Engine core initialization failed. See root cause above. Failed core proc(s): {}'.
