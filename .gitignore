@@ -221,6 +221,7 @@ llmoker/game/saves/
 llmoker/game/*.rpyc
 llmoker/log.txt
 llmoker/traceback.txt
+llmoker/models/llm/
 llmoker/data/replays/*.jsonl
 llmoker/data/memory/**/*.jsonl
 llmoker/data/**/*.sqlite
