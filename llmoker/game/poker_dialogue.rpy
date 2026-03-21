@@ -26,14 +26,12 @@ init python:
 
     def update_status_from_messages(messages, fallback=None):
         """
-        최근 처리 결과를 상태 문구로 반영한다.
+        최근 처리 결과 로그에서 마지막 문장만 뽑아 상태 표시줄에 반영한다.
+        새 로그가 없을 때만 `fallback`을 써서, 예전 상태 문구가 불필요하게 덮어써지지 않게 한다.
 
         Args:
             messages: 최근 처리 결과 로그 목록이다.
             fallback: 로그가 비었을 때 대신 넣을 문자열이다.
-
-        Returns:
-            없음.
         """
 
         if messages:
@@ -162,7 +160,7 @@ init python:
         result_summary = _round_result_summary_text(match)
         generation = match.llm_agent.generate_dialogue(match, event_name, result_summary=result_summary)
         if generation.get("status") != "ok":
-            reason = generation.get("reason", "LLM 대사 생성 실패")
+            reason = (generation.get("reason") or "").strip() or "LLM 대사 생성 실패"
             match._debug_terminal_log("%s 대사 생성 실패 / 이벤트: %s / 이유: %s" % (
                 match.bot.name,
                 event_name,
@@ -190,14 +188,12 @@ init python:
 
     def play_dialogue_event(event_name, messages=None):
         """
-        이벤트에 맞는 대사를 출력한다.
+        현재 이벤트에 맞는 대사를 만들고, 전용 배경 화면 위에서 순서대로 출력한다.
+        LLM NPC 모드면 LLM 대사를 먼저 시도하고, 아니라면 스크립트 대사 테이블을 사용한다.
 
         Args:
             event_name: 대사 이벤트 이름이다.
             messages: 직전 처리 결과 로그 목록이다.
-
-        Returns:
-            없음.
         """
 
         lines = _llm_dialogue_lines(event_name, messages)

@@ -8,12 +8,10 @@ from backend.sqlite_compat import sqlite
 class MemoryManager:
     """
     NPC의 단기/장기 기억을 SQLite로 관리한다.
+    정책 회고를 scope별로 분리해 저장하고, 다음 프롬프트에서 필요한 범위만 다시 읽어오게 만든다.
 
     Args:
         db_path: 기억 SQLite 파일 경로다.
-
-    Returns:
-        없음.
     """
 
     def __init__(self, db_path):
@@ -23,10 +21,8 @@ class MemoryManager:
 
     def _connect(self):
         """
-        SQLite 연결을 생성한다.
-
-        Args:
-            없음.
+        현재 기억 데이터베이스 파일에 대한 새 SQLite 연결을 연다.
+        메모리 읽기와 쓰기가 모두 짧은 쿼리라 연결 풀 대신 매번 열고 닫는 방식을 유지한다.
 
         Returns:
             현재 기억 DB 연결 객체다.
@@ -36,13 +32,8 @@ class MemoryManager:
 
     def _initialize_db(self):
         """
-        기억 저장 테이블을 초기화한다.
-
-        Args:
-            없음.
-
-        Returns:
-            없음.
+        기억 저장 테이블이 없으면 만든다.
+        스키마 보장만 담당하며, 이미 테이블이 있을 때는 데이터에 손대지 않는다.
         """
 
         with self._connect() as connection:
@@ -69,8 +60,7 @@ class MemoryManager:
             metadata: 함께 저장할 부가 정보 사전이다.
             long_term: 장기 기억 여부다.
 
-        Returns:
-            없음.
+        단기 기억과 장기 기억은 `memory_scope` 컬럼으로만 구분해, 검색 경로는 단순하게 유지한다.
         """
 
         memory_scope = "long_term" if long_term else "short_term"

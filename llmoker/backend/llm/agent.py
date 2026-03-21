@@ -1,243 +1,201 @@
-"""LLM NPC의 프롬프트 조합과 응답 해석을 담당한다."""
+"""포커 엔진이 Qwen 런타임을 한 가지 방식으로만 쓰게 만드는 어댑터다."""
 
-from backend.llm.prompts import (
-    build_action_prompt,
-    build_dialogue_prompt,
-    build_draw_prompt,
-    build_policy_feedback_prompt,
-    build_public_state_text,
+from __future__ import annotations
+
+from backend.llm.client import QwenRuntimeClient
+from backend.llm.results import build_error_result, build_success_result, normalize_error_reason
+from backend.llm.tasks import (
+    build_action_task,
+    build_dialogue_task,
+    build_draw_task,
+    build_policy_task,
 )
-from backend.llm.results import (
-    build_action_result,
-    build_dialogue_result,
-    build_draw_result,
-    build_error_result,
-    build_policy_feedback_result,
-)
-from backend.llm.worker_client import LocalLLMWorkerClient
 
 
 class LocalLLMAgent:
     """
-    포커 엔진과 Qwen-Agent 워커 사이를 잇는 얇은 어댑터다.
+    포커 엔진이 Qwen 런타임에 행동, 드로우, 대사, 회고를 요청하게 만드는 어댑터다.
 
     Args:
         local_model_path: 로컬 모델 폴더 경로다.
-        llm_model_name: 표시용 모델 이름이다.
-        runner_python: 워커 실행용 파이썬 경로다.
-        llm_device: 디바이스 힌트다.
+        llm_model_name: vLLM served model 이름이다.
+        llm_runtime_python: 런타임을 띄울 Python 3.11 실행 파일 경로다.
+        llm_device: vLLM 실행 디바이스 힌트다.
+        llm_gpu_memory_utilization: vLLM이 사용할 GPU 메모리 비율이다.
         memory_manager: 기억 저장소 객체다.
-
-    Returns:
-        없음.
+        runtime_port: 런타임 HTTP 서버 포트다.
+        vllm_port: 내부 vLLM 포트다.
     """
 
     def __init__(
         self,
         local_model_path,
         llm_model_name,
-        runner_python,
+        llm_runtime_python,
         llm_device,
+        llm_gpu_memory_utilization,
         memory_manager,
+        runtime_port=8011,
+        vllm_port=8000,
     ):
         self.memory_manager = memory_manager
-        self.worker_client = LocalLLMWorkerClient(
+        self.client = QwenRuntimeClient(
             model_path=local_model_path,
             model_name=llm_model_name,
-            runner_python=runner_python,
+            runtime_python=llm_runtime_python,
             device=llm_device,
+            gpu_memory_utilization=llm_gpu_memory_utilization,
+            runtime_port=runtime_port,
+            vllm_port=vllm_port,
         )
-        self.last_status = "LLM 워커가 아직 시작되지 않았습니다."
+        self.last_status = "Qwen 런타임이 아직 시작되지 않았습니다."
 
     def reconfigure(
         self,
         local_model_path=None,
         llm_model_name=None,
-        runner_python=None,
+        llm_runtime_python=None,
         llm_device=None,
+        llm_gpu_memory_utilization=None,
+        llm_runtime_port=None,
+        llm_vllm_port=None,
     ):
         """
-        워커가 바라보는 모델과 디바이스 설정을 바꾼다.
+        런타임 설정을 바꾼다.
 
         Args:
-            local_model_path: 새 로컬 모델 경로다.
-            llm_model_name: 새 모델 표시 이름이다.
-            runner_python: 새 워커 파이썬 경로다.
+            local_model_path: 새 모델 경로다.
+            llm_model_name: 새 모델 이름이다.
+            llm_runtime_python: 새 Python 3.11 경로다.
             llm_device: 새 디바이스 힌트다.
-
-        Returns:
-            없음.
+            llm_gpu_memory_utilization: 새 GPU 메모리 사용 비율이다.
+            llm_runtime_port: 새 런타임 포트다.
+            llm_vllm_port: 새 vLLM 포트다.
         """
 
-        self.worker_client.configure(
+        self.client.configure(
             model_path=local_model_path,
             model_name=llm_model_name,
-            runner_python=runner_python,
+            runtime_python=llm_runtime_python,
             device=llm_device,
+            gpu_memory_utilization=llm_gpu_memory_utilization,
+            runtime_port=llm_runtime_port,
+            vllm_port=llm_vllm_port,
         )
-        self.last_status = self.worker_client.last_status
+        self.last_status = self.client.last_status
 
-    def shutdown_worker(self):
+    def start(self):
         """
-        실행 중인 워커와 연결된 리소스를 정리한다.
-
-        Args:
-            없음.
+        런타임을 미리 시작해 첫 요청 지연을 줄인다.
 
         Returns:
-            없음.
+            런타임 준비 성공 여부다.
         """
 
-        self.worker_client.shutdown()
+        ready = self.client.start()
+        self.last_status = self.client.last_status
+        return ready
 
-    def _memory_context(self, bot_name):
+    def stop(self):
         """
-        프롬프트에 넣을 단기 기억과 장기 기억을 읽어온다.
+        런타임을 종료한다.
+        """
+
+        self.client.stop()
+
+    def memory_context(self, bot_name):
+        """
+        NPC가 참고할 단기 기억과 장기 기억을 읽어온다.
 
         Args:
             bot_name: 기억을 조회할 NPC 이름이다.
 
         Returns:
-            `(short_term, long_term)` 튜플이다.
+            단기 기억 목록과 장기 기억 목록 튜플이다.
         """
 
         short_term = self.memory_manager.get_recent_feedback(bot_name, limit=5, long_term=False)
         long_term = self.memory_manager.get_recent_feedback(bot_name, limit=5, long_term=True)
         return short_term, long_term
 
-    def _ensure_ready(self):
+    def run_task(self, task, failure_message):
         """
-        워커가 요청 가능한 상태인지 확인한다.
+        태스크 하나를 런타임에 보내고 표준 오류 처리를 적용한다.
 
         Args:
-            없음.
+            task: 실행할 포커 태스크 객체다.
+            failure_message: 기본 실패 문구다.
 
         Returns:
-            워커 준비 여부다.
+            런타임 응답 사전이다.
         """
 
-        ready = self.worker_client.ensure_ready()
-        self.last_status = self.worker_client.last_status
-        return ready
-
-    def _retryable_worker_request(self, payload, retry_on_stale=True):
-        """
-        오래된 워커 오류만 한 번 복구 재시도한다.
-
-        Args:
-            payload: 워커에 보낼 요청 사전이다.
-            retry_on_stale: 오래된 오류일 때 한 번 더 재시도할지 여부다.
-
-        Returns:
-            워커 응답 사전이다.
-        """
-
-        response = self.worker_client.request(payload)
-        if (
-            retry_on_stale
-            and response.get("status") != "ok"
-            and self.worker_client._is_stale_reason(response.get("error", ""))
-        ):
-            self.worker_client.reset()
-            if not self._ensure_ready():
-                return {"status": "error", "error": self.last_status}
-            return self._retryable_worker_request(payload, retry_on_stale=False)
+        response = self.client.request(task.to_payload())
+        if response.get("status") != "ok":
+            raw_reason = response.get("reason")
+            if raw_reason is None:
+                raw_reason = response.get("error")
+            reason = normalize_error_reason(raw_reason, failure_message)
+            self.last_status = reason
+            return build_error_result(reason)
+        self.last_status = "Qwen 런타임 요청 성공"
         return response
 
     def choose_action(self, match, legal_actions):
         """
-        현재 공개 상태와 기억을 바탕으로 행동을 고르게 한다.
+        현재 베팅 턴에서 합법 행동 하나를 고른다.
 
         Args:
             match: 현재 포커 매치 객체다.
-            legal_actions: 현재 허용된 행동 목록이다.
+            legal_actions: 현재 턴 허용 행동 목록이다.
 
         Returns:
             행동 선택 결과 사전이다.
         """
 
-        if not self._ensure_ready():
-            return build_error_result(self.last_status)
-
-        short_term, long_term = self._memory_context(match.bot.name)
-        prompt = build_action_prompt(legal_actions)
-        response = self._retryable_worker_request(
-            {
-                "mode": "action",
-                "prompt": prompt,
-                "legal_actions": legal_actions,
-                "context": {
-                    "public_state": build_public_state_text(match, legal_actions),
-                    "recent_feedback": short_term,
-                    "long_term_memory": long_term,
-                    "recent_log": match.get_public_log_lines(limit=8),
-                },
-            }
-        )
+        short_term, long_term = self.memory_context(match.bot.name)
+        task = build_action_task(match, legal_actions, short_term, long_term)
+        response = self.run_task(task, "LLM 행동 선택 실패")
         if response.get("status") != "ok":
-            self.last_status = response.get("error", "LLM 응답 실패")
-            return build_error_result(self.last_status)
-
+            return response
         action = response.get("action")
         if action not in legal_actions:
-            self.last_status = "LLM이 불법 행동을 반환했습니다."
-            return build_error_result(self.last_status)
-
-        self.last_status = "LLM NPC 응답 성공"
-        return build_action_result(action, response.get("reason", "LLM NPC 응답"))
+            return build_error_result("LLM이 허용되지 않은 행동을 반환했습니다.")
+        return build_success_result(
+            action=action,
+            reason=str(response.get("reason", "")).strip() or "LLM이 행동을 선택했습니다.",
+        )
 
     def choose_discards(self, match, max_discards):
         """
-        현재 손패와 공개 상태를 바탕으로 교체 인덱스를 고르게 한다.
+        현재 손패 기준으로 교체할 카드 인덱스를 고른다.
 
         Args:
             match: 현재 포커 매치 객체다.
-            max_discards: 교체 가능한 최대 장수다.
+            max_discards: 최대 교체 장수다.
 
         Returns:
-            드로우 판단 결과 사전이다.
+            카드 교체 결과 사전이다.
         """
 
-        if not self._ensure_ready():
-            return build_error_result(self.last_status)
-
-        short_term, long_term = self._memory_context(match.bot.name)
-        prompt = build_draw_prompt(max_discards)
-        response = self._retryable_worker_request(
-            {
-                "mode": "draw",
-                "prompt": prompt,
-                "max_discards": max_discards,
-                "context": {
-                    "public_state": build_public_state_text(match, []),
-                    "recent_feedback": short_term,
-                    "long_term_memory": long_term,
-                    "recent_log": match.get_public_log_lines(limit=8),
-                },
-            }
-        )
+        short_term, long_term = self.memory_context(match.bot.name)
+        task = build_draw_task(match, max_discards, short_term, long_term)
+        response = self.run_task(task, "LLM 카드 교체 판단 실패")
         if response.get("status") != "ok":
-            self.last_status = response.get("error", "LLM 교체 판단 실패")
-            return build_error_result(self.last_status)
+            return response
 
-        discard_indexes = response.get("discard_indexes", [])
-        if not isinstance(discard_indexes, list):
-            self.last_status = "LLM이 잘못된 교체 형식을 반환했습니다."
-            return build_error_result(self.last_status)
-
-        cleaned = []
-        for index in discard_indexes:
-            if isinstance(index, int) and 0 <= index <= 4 and index not in cleaned:
-                cleaned.append(index)
-        if len(cleaned) > max_discards:
-            cleaned = cleaned[:max_discards]
-
-        self.last_status = "LLM NPC 교체 판단 성공"
-        return build_draw_result(cleaned, response.get("reason", "LLM NPC 교체 판단"))
+        discard_indexes = []
+        for index in response.get("discard_indexes", []):
+            if isinstance(index, int) and 0 <= index <= 4 and index not in discard_indexes:
+                discard_indexes.append(index)
+        return build_success_result(
+            discard_indexes=discard_indexes[:max_discards],
+            reason=str(response.get("reason", "")).strip() or "LLM이 카드 교체를 판단했습니다.",
+        )
 
     def generate_dialogue(self, match, event_name, result_summary=None):
         """
-        현재 이벤트에 맞는 심리전 대사를 생성한다.
+        현재 이벤트에 맞는 심리전 대사를 만든다.
 
         Args:
             match: 현재 포커 매치 객체다.
@@ -248,47 +206,20 @@ class LocalLLMAgent:
             대사 생성 결과 사전이다.
         """
 
-        if not self._ensure_ready():
-            return build_error_result(self.last_status, text="")
-
-        short_term, long_term = self._memory_context(match.bot.name)
-        legal_actions = []
-        if match.phase in ("betting1", "betting2") and not match.round_over:
-            legal_actions = match._get_available_actions("bot")
-
-        prompt = build_dialogue_prompt(
-            event_name=event_name,
-            result_summary=result_summary,
-            player_name=match.player.name,
-            bot_name=match.bot.name,
-        )
-        response = self._retryable_worker_request(
-            {
-                "mode": "dialogue",
-                "prompt": prompt,
-                "context": {
-                    "public_state": build_public_state_text(match, legal_actions),
-                    "recent_feedback": short_term,
-                    "long_term_memory": long_term,
-                    "recent_log": match.get_public_log_lines(limit=8),
-                },
-            }
-        )
+        short_term, long_term = self.memory_context(match.bot.name)
+        task = build_dialogue_task(match, event_name, result_summary, short_term, long_term)
+        response = self.run_task(task, "LLM 대사 생성 실패")
         if response.get("status") != "ok":
-            self.last_status = response.get("error", "LLM 대사 생성 실패")
-            return build_error_result(self.last_status, text="")
+            return build_error_result(response.get("reason", "LLM 대사 생성 실패"), text="")
 
-        text = response.get("text", "").strip()
+        text = str(response.get("text", "")).strip()
         if not text:
-            self.last_status = "LLM이 빈 대사를 반환했습니다."
-            return build_error_result(self.last_status, text="")
-
-        self.last_status = "LLM NPC 대사 생성 성공"
-        return build_dialogue_result(text, response.get("reason", "LLM NPC 대사 생성"))
+            return build_error_result("Qwen-Agent가 유효한 심리전 대사를 만들지 못했습니다.", text="")
+        return build_success_result(text=text, reason="Qwen-Agent 대사 생성 성공")
 
     def generate_policy_feedback(self, round_summary, public_log, bot_name):
         """
-        라운드 결과를 회고해서 다음 전략 문맥을 만든다.
+        방금 끝난 라운드를 회고해 다음 전략 문맥을 만든다.
 
         Args:
             round_summary: 라운드 종료 요약 사전이다.
@@ -296,36 +227,16 @@ class LocalLLMAgent:
             bot_name: 회고를 저장할 NPC 이름이다.
 
         Returns:
-            정책 피드백 결과 사전이다.
+            회고 결과 사전이다.
         """
 
-        if not self._ensure_ready():
-            return build_error_result(self.last_status)
-
-        short_term, long_term = self._memory_context(bot_name)
-        prompt = build_policy_feedback_prompt()
-        response = self._retryable_worker_request(
-            {
-                "mode": "policy",
-                "prompt": prompt,
-                "context": {
-                    "round_summary": round_summary,
-                    "recent_feedback": short_term,
-                    "long_term_memory": long_term,
-                    "recent_log": public_log[-12:],
-                },
-            }
-        )
+        short_term, long_term = self.memory_context(bot_name)
+        task = build_policy_task(round_summary, public_log, bot_name, short_term, long_term)
+        response = self.run_task(task, "LLM 라운드 회고 생성 실패")
         if response.get("status") != "ok":
-            self.last_status = response.get("error", "LLM 정책 피드백 생성 실패")
-            return build_error_result(self.last_status)
-
-        short_text = (response.get("short_term") or "").strip()
-        long_text = (response.get("long_term") or "").strip()
-        focus_text = (response.get("strategy_focus") or "").strip()
-        if not short_text or not long_text or not focus_text:
-            self.last_status = "LLM이 불완전한 정책 피드백을 반환했습니다."
-            return build_error_result(self.last_status)
-
-        self.last_status = "LLM NPC 정책 피드백 생성 성공"
-        return build_policy_feedback_result(short_text, long_text, focus_text)
+            return response
+        return build_success_result(
+            short_term=str(response.get("short_term", "")).strip(),
+            long_term=str(response.get("long_term", "")).strip(),
+            strategy_focus=str(response.get("strategy_focus", "")).strip(),
+        )

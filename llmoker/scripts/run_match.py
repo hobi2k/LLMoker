@@ -45,13 +45,8 @@ def scripted_player_betting_action(match):
 
 def main():
     """
-    스크립트봇과 자동 플레이어의 한 판 테스트를 실행한다.
-
-    Args:
-        없음.
-
-    Returns:
-        없음.
+    스크립트봇과 자동 플레이어를 붙여 한 라운드 테스트를 CLI에서 끝까지 실행한다.
+    Ren'Py를 띄우지 않고 규칙 엔진과 드로우 흐름을 빠르게 점검할 때 사용하는 개발용 진입점이다.
     """
 
     config = load_backend_config(ROOT)

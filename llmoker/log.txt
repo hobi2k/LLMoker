@@ -1,19 +1,15 @@
-2026-03-21 11:00:35 UTC
+2026-03-21 20:55:38 UTC
 Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39
 Ren'Py 8.2.1.24030407
 
-5 Draw minigame
-1.0
-Built at 2024-03-31 18:24:20 UTC
-
-Early init took 0.04s
-Loading error handling took 0.03s
-Loading script took 0.08s
-Loading save slot metadata took 0.02s
+Early init took 0.02s
+Loading error handling took 0.01s
+Loading script took 0.04s
+Loading save slot metadata took 0.01s
 Loading persistent took 0.00s
 Set script version to: (8, 2, 1)
-Running init code took 0.04s
-Loading analysis data took 0.02s
+Running init code took 0.03s
+Loading analysis data took 0.01s
 Analyze and compile ATL took 0.00s
 Reloading save slot metadata took 0.01s
 Index archives took 0.00s
@@ -29,11 +25,11 @@ Build styles took 0.00s
 Load screen analysis took 0.01s
 Analyze screens took 0.00s
 Save screen analysis took 0.00s
-Prepare screens took 0.03s
+Prepare screens took 0.02s
 Save pyanalysis. took 0.00s
 Save bytecode. took 0.00s
 Running _start took 0.00s
-Interface start took 0.52s
+Interface start took 0.10s
 
 Initializing gl2 renderer:
 primary display bounds: (0, 0, 1920, 1080)
@@ -44,36 +40,35 @@ Renderer: b'llvmpipe (LLVM 20.1.2, 256 bits)'
 Version: b'4.5 (Compatibility Profile) Mesa 25.2.8-0ubuntu0.24.04.1'
 Display Info: None
 Screen sizes: virtual=(1024, 576) physical=(1024, 576) drawable=(1024, 576)
+Could not open 'cache/shaders.txt':
 Maximum texture size: 4096x4096
-Traceback (most recent call last):
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/lib/py3-linux-x86_64/../../5Drawminigame.py", line 304, in <module>
-    main()
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/lib/py3-linux-x86_64/../../5Drawminigame.py", line 300, in main
-    renpy.bootstrap.bootstrap(renpy_base)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/bootstrap.py", line 359, in bootstrap
-    renpy.main.main()
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/main.py", line 635, in main
-    run(restart)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/main.py", line 145, in run
-    renpy.execution.run_context(True)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/execution.py", line 955, in run_context
-    context.run()
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/execution.py", line 596, in run
-    node.execute()
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/ast.py", line 823, in execute
-    renpy.python.py_exec_bytecode(self.code.bytecode, self.hide, store=self.store)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/python.py", line 1178, in py_exec_bytecode
-    exec(bytecode, globals, locals)
-  File "game/poker_minigame.rpy", line 7, in <module>
-    $ play_dialogue_event("match_intro")
-  File "game/poker_dialogue.rpy", line 203, in play_dialogue_event
-    lines = _llm_dialogue_lines(event_name, messages)
-  File "game/poker_dialogue.rpy", line 163, in _llm_dialogue_lines
-    generation = match.llm_agent.generate_dialogue(match, event_name, result_summary=result_summary)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/backend/llm/agent.py", line 265, in generate_dialogue
-    response = self._retryable_worker_request(
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/backend/llm/agent.py", line 135, in _retryable_worker_request
-    response = self.worker_client.request(payload)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/backend/llm/worker_client.py", line 311, in request
-    response_line = process.stdout.readline().strip()
-KeyboardInterrupt
+[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: match_intro / 내용: 아, 또 여기서 카드 놓는 거야?
+[LLMoker][DEBUG] 라운드 1 시작 / 사야 시작 손패: 다이아 3, 하트 2, 다이아 Queen, 하트 10, 하트 5 (하이카드)
+[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: round_start / 내용: 아, 또 라운드 시작이야. 이번엔 뭘 끌어내는지 궁금해.
+[LLMoker][DEBUG] 사야 행동 판단 시작 / 페이즈: 첫 번째 베팅 / 손패: 다이아 3, 하트 2, 다이아 Queen, 하트 10, 하트 5 (하이카드) / 허용 행동: check, bet
+[LLMoker][DEBUG] 사야 행동 선택 완료 / 선택: bet / 이유: 하이카드를 가진 손패이므로 베팅하여 리스크를 증가시킨다. / 상태: Qwen 런타임 요청 성공
+[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: betting / 내용: 아, 또 체크했네? 그거 진짜 빠르게 끝내는 거야.
+[LLMoker][DEBUG] 사야 정책 피드백 실패 / 단기: 정책 피드백 생성 실패: Qwen-Agent 응답에서 라운드 회고 JSON을 찾지 못했습니다. 출력 미리보기: {"short_term": "상대가 강한 베팅을 했으나, 내 손패가 부족해 폴드하게 되어 손실이 발생했습니다.", "long_term": "상대의 베팅 패턴을 분석하여 손패의 강도에 따라 적절한 반응을 선택하는 전략을 지속할 것입니다.", "strategy_focus": "다음 판에서는 / 장기: 정책 피드백 생성이 실패해 이번 라운드 회고를 저장하지 못했다. / 초점: LLM 정책 피드백 오류 원인 확인
+[LLMoker][DEBUG] 폴드 종료 / 승자: 사야 / 팟: 20칩 / 사야 손패: 다이아 3, 하트 2, 다이아 Queen, 하트 10, 하트 5 (하이카드)
+[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: betting / 내용: 하이카드 같아서 놀라운데, 팟이 20칩이면 그거 뭐야?
+[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: round_end / 내용: 하이카드 같아? 그거 진짜 높은 수준이야.
+[LLMoker][DEBUG] 라운드 2 시작 / 사야 시작 손패: 클로버 7, 스페이드 7, 다이아 2, 다이아 3, 하트 Ace (원페어)
+[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: round_start / 내용: 이번 라운드, 또 뭐가 나올 거야?
+[LLMoker][DEBUG] 사야 행동 판단 시작 / 페이즈: 첫 번째 베팅 / 손패: 클로버 7, 스페이드 7, 다이아 2, 다이아 3, 하트 Ace (원페어) / 허용 행동: check, bet
+[LLMoker][DEBUG] 사야 행동 선택 완료 / 선택: bet / 이유: 원페어를 가진 손패이므로 더 강한 족보를 만들 가능성이 있어 베팅 / 상태: Qwen 런타임 요청 성공
+[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: betting / 내용: 이거 체크한 거야? 진짜로?
+[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: betting / 내용: 아, 또 체크했네? 그거 진짜 빠르게 끝나는 건가요?
+[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: draw / 내용: 이거 뭔가 빠르게 봐야겠어?
+[LLMoker][DEBUG] 사야 카드 교체 판단 시작 / 현재 손패: 클로버 7, 스페이드 7, 다이아 2, 다이아 3, 하트 Ace (원페어)
+[LLMoker][DEBUG] 사야 카드 교체 선택 완료 / 버릴 인덱스: [0, 2] / 이유: 7을 교체해 더 강한 족보를 만든다. / 상태: Qwen 런타임 요청 성공
+[LLMoker][DEBUG] 사야 드로우 후 손패: 스페이드 Queen, 스페이드 7, 다이아 5, 다이아 3, 하트 Ace (하이카드)
+[LLMoker][DEBUG] 사야 행동 판단 시작 / 페이즈: 두 번째 베팅 / 손패: 스페이드 Queen, 스페이드 7, 다이아 5, 다이아 3, 하트 Ace (하이카드) / 허용 행동: fold, call, raise
+[LLMoker][DEBUG] 사야 행동 선택 완료 / 선택: call / 이유: action: call
+reason: 현재 손패는 하이카드로 강한 힘이 있으므로 콜로 진행합니다. / 상태: Qwen 런타임 요청 성공
+[LLMoker][DEBUG] 쇼다운 / 플레이어: 스페이드 Jack, 다이아 10, 스페이드 2, 클로버 Jack, 클로버 10 (투페어) / 사야: 스페이드 Queen, 스페이드 7, 다이아 5, 다이아 3, 하트 Ace (하이카드)
+[LLMoker][DEBUG] 사야 정책 피드백 실패 / 단기: 정책 피드백 생성 실패: Qwen-Agent 응답에서 라운드 회고 JSON을 찾지 못했습니다. 출력 미리보기: {"short_term": "이번 판에서 상대가 원페어를 보여주며 콜했고, 내 손패가 그에 비해 약한 것으로 판단되어 팟을 잃었다.", "long_term": "상대가 강한 족보를 보일 경우 콜보다는 폴드를 고려하고, 손패의 희소성과 페이트를 더 철 / 장기: 정책 피드백 생성이 실패해 이번 라운드 회고를 저장하지 못했다. / 초점: LLM 정책 피드백 오류 원인 확인
+[LLMoker][DEBUG] 쇼다운 결과 / 승자: 플레이어 / 팟: 50칩
+[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: betting / 내용: 투페어가 나온 거야? 하이카드로 끝내고 싶은 거야?
+[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: round_end / 내용: 투페어라니, 그게 진짜 뭐야? 하이카드가 뭐가 더 빨리 떨어지냐고.
+[LLMoker][DEBUG] 라운드 3 시작 / 사야 시작 손패: 클로버 7, 다이아 8, 하트 Jack, 다이아 Queen, 스페이드 7 (원페어)
+[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: round_start / 내용: 아, 또 라운드 시작이야. 이번엔 뭘 내려놓을지 궁금해.

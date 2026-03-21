@@ -8,12 +8,10 @@ from backend.sqlite_compat import sqlite
 class SaveStateStore:
     """
     SQLite에 세이브 슬롯을 저장하고 불러온다.
+    Ren'Py 기본 세이브 대신 포커 매치 스냅샷만 따로 저장해 슬롯 정보를 단순하게 유지한다.
 
     Args:
         db_path: 세이브 SQLite 파일 경로다.
-
-    Returns:
-        없음.
     """
 
     def __init__(self, db_path):
@@ -23,10 +21,8 @@ class SaveStateStore:
 
     def _connect(self):
         """
-        SQLite 연결을 생성한다.
-
-        Args:
-            없음.
+        현재 세이브 데이터베이스 파일에 대한 새 SQLite 연결을 연다.
+        짧은 트랜잭션 단위로 `with` 블록 안에서 바로 쓰도록 매 호출마다 새 연결을 만든다.
 
         Returns:
             현재 세이브 DB 연결 객체다.
@@ -36,13 +32,8 @@ class SaveStateStore:
 
     def _initialize_db(self):
         """
-        세이브 슬롯 테이블을 초기화한다.
-
-        Args:
-            없음.
-
-        Returns:
-            없음.
+        세이브 슬롯 테이블이 아직 없으면 생성한다.
+        앱 시작 시 여러 번 호출돼도 같은 스키마만 보장하고 추가 부작용은 만들지 않는다.
         """
 
         with self._connect() as connection:
@@ -66,8 +57,7 @@ class SaveStateStore:
             label: 화면 표시용 슬롯 이름이다.
             snapshot: 저장할 게임 상태 사전이다.
 
-        Returns:
-            없음.
+        저장은 슬롯 번호 기준 upsert로 처리해 같은 슬롯을 다시 저장하면 최신 내용으로 덮어쓴다.
         """
 
         payload = json.dumps(snapshot, ensure_ascii=False)
@@ -107,10 +97,8 @@ class SaveStateStore:
 
     def list_slots(self):
         """
-        화면 표시용 슬롯 목록을 반환한다.
-
-        Args:
-            없음.
+        화면 표시용 슬롯 목록을 고정 슬롯 수 기준으로 만든다.
+        비어 있는 슬롯도 항상 함께 돌려줘 UI가 별도 보정 없이 1~3번 슬롯을 그대로 렌더링할 수 있게 한다.
 
         Returns:
             슬롯 정보 사전 목록이다.

@@ -5,7 +5,8 @@ from dataclasses import dataclass
 @dataclass
 class BackendConfig:
     """
-    게임 런타임과 LLM 연결에 필요한 설정 묶음이다.
+    게임 룰, LLM 경로, SQLite 저장소 경로를 한 번에 보관하는 런타임 설정 묶음이다.
+    포커 엔진, Ren'Py 화면, Qwen-Agent 런타임이 같은 설정 객체를 공유하도록 하기 위해 dataclass로 유지한다.
 
     Args:
         ante: 라운드 시작 앤티 금액이다.
@@ -16,14 +17,14 @@ class BackendConfig:
         bot_mode: 기본 상대 AI 모드다.
         local_llm_path: 로컬 모델 폴더 경로다.
         llm_model_name: 표시용 모델 이름이다.
-        llm_runner_python: 워커 실행용 파이썬 경로다.
+        llm_runtime_python: Qwen 런타임 실행용 Python 3.11 경로다.
         llm_device: 디바이스 힌트다.
+        llm_gpu_memory_utilization: vLLM이 사용할 GPU 메모리 비율이다.
+        llm_runtime_port: Qwen 런타임 HTTP 포트다.
+        llm_vllm_port: 내부 vLLM OpenAI 호환 포트다.
         memory_db_path: 기억 SQLite 경로다.
         replay_db_path: 리플레이 SQLite 경로다.
         save_db_path: 세이브 SQLite 경로다.
-
-    Returns:
-        없음.
     """
 
     ante: int = 5
@@ -33,9 +34,12 @@ class BackendConfig:
     max_raises_per_round: int = 3
     bot_mode: str = "llm_npc"
     local_llm_path: str = "./models/llm"
-    llm_model_name: str = "qwen3-4b-thinking"
-    llm_runner_python: str = "./.venv/bin/python"
+    llm_model_name: str = "qwen3-4b-instruct-fp8"
+    llm_runtime_python: str = "./.venv/bin/python"
     llm_device: str = "auto"
+    llm_gpu_memory_utilization: float = 0.8
+    llm_runtime_port: int = 8011
+    llm_vllm_port: int = 8000
     memory_db_path: str = "./data/memory/memory.sqlite3"
     replay_db_path: str = "./data/replays/replays.sqlite3"
     save_db_path: str = "./data/save/game_state.sqlite3"
@@ -52,21 +56,20 @@ def load_backend_config(base_dir):
         현재 실행 환경을 반영한 `BackendConfig` 객체다.
     """
 
-    default_model_path = os.path.join(base_dir, "models", "llm", "qwen3-4b-thinking")
-    if not os.path.isdir(default_model_path):
-        default_model_path = os.path.join(base_dir, "models", "llm")
-
+    default_model_path = os.path.join(base_dir, "models", "llm", "qwen3-4b-instruct-fp8")
     local_llm_path = os.environ.get("LOCAL_LLM_PATH", default_model_path)
-    default_model_name = os.path.basename(local_llm_path.rstrip(os.sep)) or "qwen3-4b-thinking"
-    if default_model_name == "qwen3-4b-thinking":
-        default_model_name = "Qwen3-4B-Thinking-2507"
+    default_model_name = os.path.basename(local_llm_path.rstrip(os.sep)) or "qwen3-4b-instruct-fp8"
+    if default_model_name == "qwen3-4b-instruct-fp8":
+        default_model_name = "Qwen3-4B-Instruct-2507-FP8"
     llm_model_name = os.environ.get("LLM_MODEL_NAME", default_model_name)
-    default_runner_python = os.path.join(base_dir, ".venv", "bin", "python")
-    if not os.path.isfile(default_runner_python):
-        default_runner_python = "python3"
-
-    llm_runner_python = os.environ.get("LLM_RUNNER_PYTHON", default_runner_python)
+    default_runtime_python = os.path.join(base_dir, ".venv", "bin", "python")
+    if not os.path.isfile(default_runtime_python):
+        default_runtime_python = "python3"
+    llm_runtime_python = os.environ.get("LLM_RUNTIME_PYTHON", default_runtime_python)
     llm_device = os.environ.get("LLM_DEVICE", "auto")
+    llm_gpu_memory_utilization = float(os.environ.get("LLM_GPU_MEMORY_UTILIZATION", "0.8"))
+    llm_runtime_port = int(os.environ.get("LLM_RUNTIME_PORT", "8011"))
+    llm_vllm_port = int(os.environ.get("LLM_VLLM_PORT", "8000"))
     memory_db_path = os.environ.get(
         "MEMORY_DB_PATH",
         os.path.join(base_dir, "data", "memory", "memory.sqlite3"),
@@ -89,8 +92,11 @@ def load_backend_config(base_dir):
         bot_mode="llm_npc",
         local_llm_path=local_llm_path,
         llm_model_name=llm_model_name,
-        llm_runner_python=llm_runner_python,
+        llm_runtime_python=llm_runtime_python,
         llm_device=llm_device,
+        llm_gpu_memory_utilization=llm_gpu_memory_utilization,
+        llm_runtime_port=llm_runtime_port,
+        llm_vllm_port=llm_vllm_port,
         memory_db_path=memory_db_path,
         replay_db_path=replay_db_path,
         save_db_path=save_db_path,

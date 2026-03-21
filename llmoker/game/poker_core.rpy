@@ -13,10 +13,8 @@ init python:
 
     def ensure_poker_runtime():
         """
-        포커 런타임 객체를 생성하거나 복원한다.
-
-        Args:
-            없음.
+        포커 매치, 기억 저장소, 리플레이 저장소, 세이브 저장소를 필요할 때만 만들고 현재 스토어에 묶는다.
+        저장된 스냅샷이 있으면 그 상태로 복원하고, 이미 런타임이 살아 있으면 최신 설정만 다시 밀어 넣는다.
 
         Returns:
             현재 스토어에 연결된 `PokerMatch` 객체다.
@@ -52,18 +50,19 @@ init python:
             store._poker_match_runtime.llm_agent.reconfigure(
                 llm_model_name=backend_config.llm_model_name,
                 local_model_path=backend_config.local_llm_path,
-                runner_python=backend_config.llm_runner_python,
+                llm_runtime_python=backend_config.llm_runtime_python,
                 llm_device=backend_config.llm_device,
+                llm_gpu_memory_utilization=backend_config.llm_gpu_memory_utilization,
+                llm_runtime_port=backend_config.llm_runtime_port,
+                llm_vllm_port=backend_config.llm_vllm_port,
             )
 
         return store._poker_match_runtime
 
     def get_poker_match():
         """
-        현재 포커 런타임 객체를 반환한다.
-
-        Args:
-            없음.
+        현재 세션에서 쓰는 `PokerMatch`를 안전하게 가져온다.
+        호출 전에 런타임이 없으면 먼저 생성되므로, 다른 화면 코드가 초기화 순서를 신경 쓰지 않아도 된다.
 
         Returns:
             현재 `PokerMatch` 객체다.
@@ -73,10 +72,8 @@ init python:
 
     def get_poker_save_store():
         """
-        SQLite 세이브 저장소 객체를 반환한다.
-
-        Args:
-            없음.
+        세이브 슬롯을 다루는 SQLite 저장소를 반환한다.
+        먼저 포커 런타임을 보장해 저장소 생성 순서가 꼬이지 않도록 한다.
 
         Returns:
             `SaveStateStore` 객체다.
@@ -107,10 +104,8 @@ init python:
 
     def sync_poker_match_state():
         """
-        런타임 매치를 세이브용 스냅샷에 동기화한다.
-
-        Args:
-            없음.
+        현재 런타임 매치를 세이브 가능한 스냅샷 사전으로 직렬화해 스토어에 반영한다.
+        저장 버튼, 슬롯 불러오기, 화면 갱신 같은 경로가 모두 같은 상태 사전을 바라보도록 맞춘다.
 
         Returns:
             최신 스냅샷 사전 또는 None이다.
@@ -144,13 +139,10 @@ init python:
 
     def save_poker_slot_and_update_status(slot):
         """
-        슬롯 저장 후 상태 문구를 함께 갱신한다.
+        현재 매치를 지정 슬롯에 저장한 뒤, 결과 문구까지 상태 표시줄에 반영한다.
 
         Args:
             slot: 저장할 슬롯 번호다.
-
-        Returns:
-            없음.
         """
 
         store.poker_status_text = save_poker_slot(slot)
@@ -176,36 +168,28 @@ init python:
 
     def load_poker_slot_and_update_status(slot):
         """
-        슬롯 불러오기 후 상태 문구를 함께 갱신한다.
+        지정 슬롯을 불러온 뒤, 복원 결과를 상태 표시줄에 함께 반영한다.
 
         Args:
             slot: 불러올 슬롯 번호다.
-
-        Returns:
-            없음.
         """
 
         store.poker_status_text = load_poker_slot(slot)
 
     def apply_poker_bot_mode(bot_mode):
         """
-        상대 AI 모드 변경 결과를 상태 문구에 반영한다.
+        상대 AI 모드를 적용하고, 변경 결과를 바로 상태 문구로 남긴다.
 
         Args:
             bot_mode: 적용할 상대 AI 모드 문자열이다.
-
-        Returns:
-            없음.
         """
 
         store.poker_status_text = set_poker_bot_mode(bot_mode)
 
     def start_round():
         """
-        새 라운드를 시작하고 선택 카드 상태를 초기화한다.
-
-        Args:
-            없음.
+        새 라운드를 열기 전에 플레이어가 고른 교체 카드 상태를 비우고, 엔진 쪽 라운드 시작 로그를 받아온다.
+        UI는 이 함수가 돌려주는 로그를 그대로 시작 대사와 상태창에 쓴다.
 
         Returns:
             라운드 시작 로그 목록이다.
@@ -216,6 +200,22 @@ init python:
         messages = match.start_new_round()
         sync_poker_match_state()
         return messages
+
+    def start_llm_npc():
+        """
+        게임 화면에 들어온 직후 Qwen 런타임을 미리 올려 첫 대사나 첫 행동에서 생기는 초기 지연을 줄인다.
+        현재 상대가 스크립트봇이면 아무것도 띄우지 않고 바로 성공으로 처리한다.
+
+        Returns:
+            준비 성공 여부다.
+        """
+
+        match = ensure_poker_runtime()
+        if match.bot_mode != "llm_npc":
+            return True
+        ready = match.llm_agent.start()
+        store.poker_status_text = match.llm_agent.last_status
+        return ready
 
     def safe_resolve_player_action(action):
         """

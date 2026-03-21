@@ -8,6 +8,7 @@ from backend.poker_hands import (
     compare_hands,
     create_deck,
     evaluate_hand,
+    format_card_ko,
     format_cards_ko,
 )
 from backend.script_bot import SimpleScriptBot
@@ -26,6 +27,7 @@ PHASE_NAMES_KO = {
 class PlayerState:
     """
     한 플레이어의 스택, 손패, 폴드 여부를 묶어 보관한다.
+    포커 엔진 안에서는 플레이어와 봇 모두 같은 상태 구조를 써서, 베팅과 드로우 로직이 양쪽을 같은 코드 경로로 다룰 수 있게 한다.
 
     Args:
         name: 화면과 로그에 표시할 플레이어 이름이다.
@@ -33,8 +35,6 @@ class PlayerState:
         hand: 현재 손패다.
         folded: 이번 라운드에서 폴드했는지 여부다.
 
-    Returns:
-        없음. 데이터 보관용 상태 객체를 만든다.
     """
 
     name: str
@@ -45,6 +45,7 @@ class PlayerState:
 class PokerMatch:
     """
     2인 5드로우 포커 매치의 상태기계와 라운드 진행을 관리한다.
+    화면 코드는 이 클래스에 행동 적용과 상태 조회만 요청하고, 베팅 규칙·드로우·쇼다운·기억 저장은 모두 여기서 처리한다.
 
     Args:
         config: 게임 규칙과 LLM 실행 설정을 담은 백엔드 설정 객체다.
@@ -53,8 +54,6 @@ class PokerMatch:
         player_name: 플레이어 표시 이름이다.
         bot_name: 상대 기본 표시 이름이다.
 
-    Returns:
-        없음. 매치 진행용 인스턴스를 초기화한다.
     """
 
     def __init__(self, config, memory_manager, replay_logger, player_name="플레이어", bot_name="스크립트봇"):
@@ -64,9 +63,12 @@ class PokerMatch:
         self.llm_agent = LocalLLMAgent(
             config.local_llm_path,
             config.llm_model_name,
-            config.llm_runner_python,
+            config.llm_runtime_python,
             config.llm_device,
+            config.llm_gpu_memory_utilization,
             memory_manager,
+            config.llm_runtime_port,
+            config.llm_vllm_port,
         )
         self.policy_loop = PolicyLoop(memory_manager, self.llm_agent)
         self.player = PlayerState(player_name, config.starting_stack)
@@ -96,12 +98,11 @@ class PokerMatch:
     def _debug_terminal_log(self, message):
         """
         게임 화면에는 보이지 않는 디버그 정보를 터미널에 남긴다.
+        LLM 판단 이유, 손패, 정책 회고처럼 플레이어에게 숨겨야 하는 정보는 모두 이 경로로만 기록한다.
 
         Args:
             message: 터미널에 찍을 디버그 문자열이다.
 
-        Returns:
-            없음. stderr에 로그 한 줄을 기록한다.
         """
 
         print("[LLMoker][DEBUG] %s" % message, file=sys.stderr, flush=True)
@@ -109,9 +110,7 @@ class PokerMatch:
     def can_continue_match(self):
         """
         양쪽 모두 다음 라운드 앤티를 낼 수 있는지 확인한다.
-
-        Args:
-            없음.
+        매치 종료 여부는 스택이 0인지가 아니라, 다음 라운드 앤티를 동시에 낼 수 있는지로 판단한다.
 
         Returns:
             다음 라운드를 시작할 수 있으면 `True`다.
@@ -122,9 +121,7 @@ class PokerMatch:
     def to_snapshot(self):
         """
         현재 매치 상태를 저장소에 넣기 쉬운 사전으로 직렬화한다.
-
-        Args:
-            없음.
+        Ren'Py 세이브 대신 이 스냅샷만 별도로 저장하므로, 화면 복원에 필요한 값들을 빠짐없이 평평한 자료형으로 담는다.
 
         Returns:
             세이브 복원에 필요한 매치 상태 사전이다.
@@ -214,6 +211,9 @@ class PokerMatch:
         match.llm_agent.reconfigure(
             llm_model_name=match.config.llm_model_name,
             llm_device=match.config.llm_device,
+            llm_gpu_memory_utilization=match.config.llm_gpu_memory_utilization,
+            llm_runtime_port=match.config.llm_runtime_port,
+            llm_vllm_port=match.config.llm_vllm_port,
         )
         match._apply_bot_mode_name()
         return match
@@ -221,9 +221,7 @@ class PokerMatch:
     def phase_name_ko(self):
         """
         현재 내부 페이즈 코드를 화면 표시용 한국어 이름으로 바꾼다.
-
-        Args:
-            없음.
+        HUD와 종료 화면은 내부 enum 문자열 대신 이 함수를 통해 사용자가 읽기 쉬운 라벨을 받는다.
 
         Returns:
             현재 페이즈를 설명하는 한국어 문자열이다.
@@ -234,12 +232,7 @@ class PokerMatch:
     def _apply_bot_mode_name(self):
         """
         현재 상대 AI 모드에 맞춰 봇 표시 이름을 갱신한다.
-
-        Args:
-            없음.
-
-        Returns:
-            없음. `self.bot.name`만 갱신한다.
+        같은 매치 인스턴스를 유지한 채 모드만 바꿀 수 있으므로, 이름 갱신을 별도 함수로 분리해 스냅샷 복원과 모드 전환에서 함께 쓴다.
         """
 
         if self.bot_mode == "llm_npc":
@@ -250,12 +243,11 @@ class PokerMatch:
     def set_bot_mode(self, bot_mode):
         """
         현재 매치에서 사용할 상대 AI 모드를 바꾸고 표시 이름도 맞춘다.
+        설정 객체와 매치 객체가 서로 다른 값을 들고 가지 않도록 두 곳을 동시에 갱신한다.
 
         Args:
             bot_mode: 적용할 상대 AI 모드 문자열이다.
 
-        Returns:
-            없음. 매치와 설정 객체의 봇 모드를 함께 갱신한다.
         """
 
         self.bot_mode = bot_mode
@@ -265,9 +257,7 @@ class PokerMatch:
     def get_bot_mode_label(self):
         """
         현재 상대 AI 모드를 화면용 한국어 라벨로 돌려준다.
-
-        Args:
-            없음.
+        UI에서는 내부 모드 문자열 대신 이 함수 결과만 사용해 화면 문구를 통일한다.
 
         Returns:
             현재 상대 AI 표시 문자열이다.
@@ -279,10 +269,8 @@ class PokerMatch:
 
     def get_llm_status_text(self):
         """
-        현재 LLM 워커 상태를 Ren'Py 화면에 안전하게 올릴 문자열로 바꾼다.
-
-        Args:
-            없음.
+        현재 LLM 브리지 상태를 Ren'Py 화면에 안전하게 올릴 문자열로 바꾼다.
+        중괄호는 Ren'Py 텍스트 태그로 오해될 수 있어 여기서 미리 이스케이프한다.
 
         Returns:
             중괄호를 이스케이프한 상태 문자열이다.
@@ -293,22 +281,18 @@ class PokerMatch:
     def get_llm_runtime_label(self):
         """
         현재 LLM NPC 실행 방식을 화면에서 읽기 쉬운 라벨로 돌려준다.
-
-        Args:
-            없음.
+        디버그용 내부 구현명을 노출하지 않고, UI에는 사람이 이해할 수 있는 한 줄 설명만 준다.
 
         Returns:
             LLM 실행 경로를 설명하는 문자열이다.
         """
 
-        return "Qwen-Agent(local transformers)"
+        return "Qwen-Agent(vLLM)"
 
     def format_bot_hand_for_prompt(self):
         """
         봇 손패를 프롬프트에 바로 넣기 쉬운 한국어 카드 문자열 목록으로 바꾼다.
-
-        Args:
-            없음.
+        프롬프트 빌더는 카드 포맷팅 규칙을 직접 알 필요 없이 이 함수 결과만 사용한다.
 
         Returns:
             봇 손패를 설명하는 문자열 목록이다.
@@ -319,9 +303,7 @@ class PokerMatch:
     def start_new_round(self):
         """
         새 라운드를 시작하면서 덱, 손패, 앤티, 로그, 베팅 상태를 초기화한다.
-
-        Args:
-            없음.
+        양쪽 손패 배분, 앤티 차감, 공개 로그 시작 문장 작성까지 한 번에 처리해 라운드 시작 경로를 이 함수 하나로 고정한다.
 
         Returns:
             라운드 시작 직후 화면과 로그에 보여 줄 메시지 목록이다.
@@ -370,9 +352,7 @@ class PokerMatch:
     def get_player_hand(self):
         """
         플레이어 손패를 원본을 건드리지 않도록 복사해서 돌려준다.
-
-        Args:
-            없음.
+        화면 코드가 받은 목록을 수정해도 엔진 내부 상태가 깨지지 않게 사본만 반환한다.
 
         Returns:
             플레이어 손패 카드 목록 사본이다.
@@ -398,9 +378,7 @@ class PokerMatch:
     def get_player_hand_name(self):
         """
         플레이어 현재 손패의 족보 이름을 계산한다.
-
-        Args:
-            없음.
+        HUD와 종료 화면이 같은 족보 계산 결과를 쓰도록 평가 함수를 한곳으로 감싼다.
 
         Returns:
             플레이어 족보의 한국어 이름이다.
@@ -411,9 +389,7 @@ class PokerMatch:
     def get_bot_hand_name(self):
         """
         봇 현재 손패의 족보 이름을 계산한다.
-
-        Args:
-            없음.
+        LLM 프롬프트, 디버그 로그, 종료 화면이 모두 같은 족보 계산 결과를 공유한다.
 
         Returns:
             봇 족보의 한국어 이름이다.
@@ -424,9 +400,7 @@ class PokerMatch:
     def is_match_finished(self):
         """
         라운드가 끝난 뒤 더 이상 다음 라운드를 열 수 없는지 확인한다.
-
-        Args:
-            없음.
+        종료 화면에서 `다음 라운드` 버튼을 보여줄지 결정할 때 이 함수만 사용한다.
 
         Returns:
             매치가 최종 종료 상태면 `True`다.
@@ -437,9 +411,7 @@ class PokerMatch:
     def get_round_result_title(self):
         """
         종료 화면 맨 위에 표시할 승패 제목을 만든다.
-
-        Args:
-            없음.
+        내부 winner 값을 화면 친화적인 제목으로 바꿔 종료 레이아웃에서 그대로 쓸 수 있게 한다.
 
         Returns:
             라운드 종료 제목 문자열이다.
@@ -458,9 +430,7 @@ class PokerMatch:
     def get_round_result_message(self):
         """
         승자, 팟, 종료 방식에 맞춰 종료 화면 핵심 문구를 만든다.
-
-        Args:
-            없음.
+        폴드 종료와 쇼다운 종료를 다른 문장으로 구분해 결과 맥락이 바로 읽히도록 만든다.
 
         Returns:
             종료 패널 본문에 들어갈 결과 문구다.
@@ -489,9 +459,7 @@ class PokerMatch:
     def get_match_result_message(self):
         """
         매치가 끝났는지, 아니면 다음 라운드로 이어지는지 설명한다.
-
-        Args:
-            없음.
+        종료 원인이 플레이어 스택 부족인지, 봇 스택 부족인지, 일반 종료인지도 함께 문장에 반영한다.
 
         Returns:
             매치 지속 여부를 알려 주는 문자열이다.
@@ -508,6 +476,7 @@ class PokerMatch:
     def get_recent_log_text(self, limit=8):
         """
         최근 로그를 화면 텍스트 박스에 넣기 좋게 여러 줄 문자열로 합친다.
+        로그 팝업은 이 문자열 하나만 받아 렌더링하므로 줄바꿈 처리도 여기서 끝낸다.
 
         Args:
             limit: 뒤에서부터 몇 줄을 묶을지 정한다.
@@ -521,6 +490,7 @@ class PokerMatch:
     def get_public_log_lines(self, limit=8):
         """
         플레이어와 NPC 모두가 볼 수 있는 공개 로그만 잘라서 돌려준다.
+        프롬프트에는 비공개 손패 정보 대신 이 공개 로그만 들어가도록 경계를 만든다.
 
         Args:
             limit: 뒤에서부터 몇 줄을 돌려줄지 정한다.
@@ -534,9 +504,7 @@ class PokerMatch:
     def is_player_turn(self):
         """
         현재 상태에서 플레이어가 실제로 행동을 고를 차례인지 판정한다.
-
-        Args:
-            없음.
+        화면 버튼 활성화 여부와 입력 처리 가능 여부가 모두 이 판정에 의존한다.
 
         Returns:
             플레이어 턴이면 `True`다.
@@ -547,9 +515,7 @@ class PokerMatch:
     def get_player_amount_to_call(self):
         """
         플레이어가 현재 베팅을 맞추기 위해 더 내야 할 칩 수를 계산한다.
-
-        Args:
-            없음.
+        HUD, 버튼 라벨, 행동 검증이 같은 콜 금액 계산을 공유하게 한다.
 
         Returns:
             플레이어 기준 콜 금액이다.
@@ -560,9 +526,7 @@ class PokerMatch:
     def get_bot_amount_to_call(self):
         """
         봇이 현재 베팅을 맞추기 위해 더 내야 할 칩 수를 계산한다.
-
-        Args:
-            없음.
+        스크립트봇과 LLM NPC 모두 이 함수 결과를 기준으로 응답 행동을 결정한다.
 
         Returns:
             봇 기준 콜 금액이다.
@@ -573,9 +537,7 @@ class PokerMatch:
     def get_player_available_actions(self):
         """
         현재 플레이어 턴에서 실제로 선택할 수 있는 합법 행동만 계산한다.
-
-        Args:
-            없음.
+        턴이 아니면 빈 목록을 돌려줘 UI가 별도 방어 코드 없이도 버튼을 숨길 수 있게 한다.
 
         Returns:
             플레이어 행동 문자열 목록이다.
@@ -588,9 +550,7 @@ class PokerMatch:
     def can_player_raise(self):
         """
         현재 플레이어 행동 목록 안에 레이즈가 포함되는지 확인한다.
-
-        Args:
-            없음.
+        버튼 표시용 간단한 질의가 반복되므로 리스트 자체 대신 bool helper를 별도로 둔다.
 
         Returns:
             지금 레이즈가 가능하면 `True`다.
@@ -601,9 +561,7 @@ class PokerMatch:
     def get_raise_total_amount(self):
         """
         플레이어가 이번 턴에 레이즈를 택할 때 실제로 내야 할 총액을 계산한다.
-
-        Args:
-            없음.
+        현재 콜 금액 위에 고정 베팅 단위를 더한 값으로, 버튼 라벨과 설명 문구에서 함께 쓴다.
 
         Returns:
             현재 콜 금액과 고정 베팅액을 합친 총 납입액이다.
@@ -614,9 +572,7 @@ class PokerMatch:
     def get_betting_status_text(self):
         """
         현재 베팅 상황을 HUD에 띄울 요약 문구로 만든다.
-
-        Args:
-            없음.
+        체크 가능 상태와 콜 필요 상태를 다른 문장으로 나눠, 플레이어가 지금 판의 압박 정도를 바로 읽게 한다.
 
         Returns:
             콜 금액과 남은 레이즈 횟수를 담은 상태 문자열이다.
@@ -634,12 +590,11 @@ class PokerMatch:
     def _start_betting_round(self, phase):
         """
         지정한 베팅 페이즈로 넘어가며 베팅 라운드 상태를 초기화한다.
+        한 베팅 라운드가 끝날 때마다 기여 금액, 연속 체크 수, 레이즈 횟수를 모두 다시 시작점으로 돌린다.
 
         Args:
             phase: 시작할 베팅 페이즈 이름이다.
 
-        Returns:
-            없음. 베팅 관련 카운터와 기여 금액을 초기화한다.
         """
 
         self.phase = phase
@@ -687,13 +642,12 @@ class PokerMatch:
     def _deduct(self, actor, amount):
         """
         지정 플레이어 스택에서 칩을 빼고 팟에도 같은 금액을 더한다.
+        칩 이동 규칙을 한곳으로 모아 베팅, 콜, 레이즈 모두 같은 회계 경로를 사용하게 한다.
 
         Args:
             actor: 칩을 낼 플레이어 상태 객체다.
             amount: 이번에 차감할 칩 수다.
 
-        Returns:
-            없음. 플레이어 스택과 팟만 갱신한다.
         """
 
         actor.stack -= amount
@@ -702,12 +656,11 @@ class PokerMatch:
     def _finish_by_fold(self, winner):
         """
         폴드로 라운드가 끝났을 때 승자 정산과 종료 요약을 처리한다.
+        팟 지급, 종료 상태 전환, 요약 생성, 디버그 로그 기록을 한 번에 끝내 다음 코드가 종료 조건을 다시 계산하지 않게 한다.
 
         Args:
             winner: 폴드 승리를 가져갈 플레이어 상태 객체다.
 
-        Returns:
-            없음. 승자 스택과 라운드 종료 상태를 갱신한다.
         """
 
         winner.stack += self.pot
@@ -726,9 +679,7 @@ class PokerMatch:
     def _advance_after_betting(self):
         """
         현재 베팅 라운드가 끝났을 때 다음 페이즈로 넘기거나 쇼다운을 연다.
-
-        Args:
-            없음.
+        첫 베팅이 끝나면 드로우로, 두 번째 베팅이 끝나면 바로 쇼다운으로 넘긴다.
 
         Returns:
             다음 페이즈 전환 과정에서 화면에 보여 줄 메시지 목록이다.
@@ -870,9 +821,7 @@ class PokerMatch:
     def _run_bot_turns(self):
         """
         플레이어 턴이 돌아오거나 라운드가 끝날 때까지 봇 턴을 연속 처리한다.
-
-        Args:
-            없음.
+        LLM NPC와 스크립트봇 모두 이 함수 안에서 행동을 선택하므로, 봇 턴 처리의 단일 진입점 역할을 한다.
 
         Returns:
             봇 턴 동안 누적된 로그 메시지 목록이다.
@@ -1034,13 +983,12 @@ class PokerMatch:
     def _replace_cards(self, actor, discard_indexes):
         """
         지정한 카드 인덱스만 새 카드로 바꿔 손패를 갱신한다.
+        드로우 규칙 자체는 단순히 인덱스 자리에 새 카드를 넣는 형태라, 플레이어와 봇 모두 같은 함수로 처리한다.
 
         Args:
             actor: 카드를 교체할 플레이어 상태 객체다.
             discard_indexes: 교체할 손패 인덱스 목록이다.
 
-        Returns:
-            없음. 대상 손패를 직접 수정한다.
         """
 
         for index in discard_indexes:
@@ -1049,9 +997,7 @@ class PokerMatch:
     def _resolve_showdown(self):
         """
         양쪽 손패를 비교해 승자를 정하고 팟을 정산한다.
-
-        Args:
-            없음.
+        공개 손패 로그, 승자 정산, LLM 디버그 로그를 모두 이 함수에서 끝내 쇼다운 흐름을 단일 경로로 유지한다.
 
         Returns:
             쇼다운 공개와 정산 과정에서 생긴 로그 메시지 목록이다.
@@ -1103,13 +1049,12 @@ class PokerMatch:
     def _finalize_round_summary(self, winner_name, folded):
         """
         라운드 종료 요약을 만들고 기억 저장과 리플레이 기록까지 마친다.
+        승패 확정 뒤 해야 하는 부수 작업을 여기에 몰아, 쇼다운 종료와 폴드 종료가 같은 후처리 경로를 쓰게 한다.
 
         Args:
             winner_name: 이번 라운드 승자 이름이다.
             folded: 폴드 종료 여부다.
 
-        Returns:
-            없음. 종료 요약, 기억, 리플레이를 모두 갱신한다.
         """
 
         self.round_over = True
@@ -1150,9 +1095,7 @@ class PokerMatch:
     def get_round_summary_lines(self):
         """
         라운드 종료 결과를 로그나 팝업에 넣기 쉬운 문자열 목록으로 만든다.
-
-        Args:
-            없음.
+        종료 화면, 로그 팝업, 디버그 출력이 같은 요약 문장을 재사용할 수 있게 줄 단위 목록으로 반환한다.
 
         Returns:
             종료 화면에 쓸 요약 문자열 목록이다.

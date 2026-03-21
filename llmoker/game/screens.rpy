@@ -364,6 +364,7 @@ screen main_menu():
 
     ## This ensures that any other menu screen is replaced.
     tag menu
+    on "show" action Function(play_main_menu_music)
 
     add "llmoker_main_menu_video" at llmoker_main_menu_video_fit
 

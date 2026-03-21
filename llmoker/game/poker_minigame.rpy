@@ -2,7 +2,9 @@ label poker_minigame:
     $ renpy.block_rollback()
     $ quick_menu = False
     $ poker_fatal_error_text = ""
+    $ play_poker_game_music()
     window hide
+    $ start_llm_npc()
     if not poker_match_intro_seen:
         $ play_dialogue_event("match_intro")
         $ poker_match_intro_seen = True
@@ -52,10 +54,11 @@ label poker_round_end:
     $ next_action = renpy.call_screen("poker_table_screen", mode="round_end")
     if next_action == "next":
         jump poker_minigame
-    jump main_menu
+    jump _main_menu
 
 label after_load:
     $ ensure_poker_runtime()
+    $ play_poker_game_music()
     return
 
 label poker_runtime_error:
@@ -63,4 +66,4 @@ label poker_runtime_error:
     "LLM NPC 실행 중 오류가 발생했습니다."
     "[poker_fatal_error_text]"
     "메인 메뉴로 돌아갑니다."
-    jump main_menu
+    jump _main_menu

@@ -11,12 +11,7 @@ from backend.poker_hands import RANK_VALUES, evaluate_hand
 class SimpleScriptBot:
     """
     LLM 없이도 한 라운드를 끝까지 진행할 수 있는 규칙 기반 상대다.
-
-    Args:
-        없음.
-
-    Returns:
-        없음.
+    테스트나 폴백이 아니라, 로컬 디버깅과 규칙 검증을 빠르게 돌리기 위한 기준 봇 역할을 맡는다.
     """
 
     def choose_open_action(self, hand, phase, bet_size):

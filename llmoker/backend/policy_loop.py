@@ -3,14 +3,12 @@
 
 class PolicyLoop:
     """
-    라운드 결과를 다음 판단 문맥에 넣을 전략 피드백으로 바꾼다.
+    라운드 결과를 다음 판단 문맥에 넣을 전략 피드백으로 바꾸고, 필요하면 기억 저장소까지 갱신한다.
+    스크립트봇일 때는 최소 규칙 기반 회고를 만들고, LLM NPC일 때는 LLM 회고 결과를 메모리에 적재한다.
 
     Args:
         memory_manager: 피드백을 저장할 기억 저장소다.
         llm_agent: 정책 회고를 생성할 LLM 어댑터다.
-
-    Returns:
-        없음.
     """
 
     def __init__(self, memory_manager, llm_agent):
