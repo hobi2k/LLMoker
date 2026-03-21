@@ -1,12 +1,13 @@
 init python:
     def toggle_discard_selection(index):
-        """toggle_discard_selection, 드로우 단계의 교체 카드 선택 상태를 토글한다.
+        """
+        드로우 단계에서 특정 카드의 교체 선택 여부를 뒤집는다.
 
         Args:
-            index: 플레이어가 클릭한 카드 인덱스.
+            index: 선택을 바꿀 카드 인덱스다.
 
         Returns:
-            None: 선택된 카드 인덱스 목록을 store에 갱신한다.
+            없음. `store.poker_selected_discards`만 갱신한다.
         """
 
         selected = list(store.poker_selected_discards)

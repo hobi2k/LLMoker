@@ -6,13 +6,14 @@ from backend.sqlite_compat import sqlite
 
 
 class MemoryManager:
-    """MemoryManager, NPC의 단기/장기 기억을 SQLite로 관리한다.
+    """
+    NPC의 단기/장기 기억을 SQLite로 관리한다.
 
     Args:
-        db_path: 기억 SQLite 파일 경로.
+        db_path: 기억 SQLite 파일 경로다.
 
     Returns:
-        MemoryManager: 기억 저장과 조회를 담당하는 객체.
+        없음.
     """
 
     def __init__(self, db_path):
@@ -21,25 +22,27 @@ class MemoryManager:
         self._initialize_db()
 
     def _connect(self):
-        """_connect, SQLite 연결을 생성한다.
+        """
+        SQLite 연결을 생성한다.
 
         Args:
             없음.
 
         Returns:
-            sqlite.Connection: SQLite 연결 객체.
+            현재 기억 DB 연결 객체다.
         """
 
         return sqlite.connect(self.db_path)
 
     def _initialize_db(self):
-        """_initialize_db, 기억 저장 테이블을 초기화한다.
+        """
+        기억 저장 테이블을 초기화한다.
 
         Args:
             없음.
 
         Returns:
-            None: 테이블을 생성한다.
+            없음.
         """
 
         with self._connect() as connection:
@@ -57,16 +60,17 @@ class MemoryManager:
             )
 
     def append_feedback(self, character_name, text, metadata=None, long_term=False):
-        """append_feedback, 캐릭터 기억 테이블에 새 피드백을 추가한다.
+        """
+        캐릭터 기억 테이블에 새 피드백을 추가한다.
 
         Args:
-            character_name: 기억을 추가할 캐릭터 이름.
-            text: 저장할 텍스트 피드백.
-            metadata: 추가 메타데이터 사전.
-            long_term: 장기 기억 저장 여부.
+            character_name: 기억을 남길 캐릭터 이름이다.
+            text: 저장할 회고 문장이다.
+            metadata: 함께 저장할 부가 정보 사전이다.
+            long_term: 장기 기억 여부다.
 
         Returns:
-            None: SQLite 테이블에 새 기억을 추가한다.
+            없음.
         """
 
         memory_scope = "long_term" if long_term else "short_term"
@@ -87,15 +91,16 @@ class MemoryManager:
             )
 
     def get_recent_feedback(self, character_name, limit=5, long_term=False):
-        """get_recent_feedback, 최근 기억 항목을 SQLite에서 조회한다.
+        """
+        최근 기억 항목을 SQLite에서 조회한다.
 
         Args:
-            character_name: 기억을 조회할 캐릭터 이름.
-            limit: 반환할 최대 항목 수.
-            long_term: 장기 기억 조회 여부.
+            character_name: 기억을 읽을 캐릭터 이름이다.
+            limit: 최대 조회 개수다.
+            long_term: 장기 기억 조회 여부다.
 
         Returns:
-            list: 최근 기억 JSON 객체 목록.
+            최근 기억 항목 사전 목록이다.
         """
 
         memory_scope = "long_term" if long_term else "short_term"

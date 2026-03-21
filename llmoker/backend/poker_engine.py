@@ -1,33 +1,18 @@
-import random
 import sys
-from collections import Counter
 from dataclasses import dataclass, field
 
-from backend.llm_agent import LocalLLMAgent
+from backend.llm.agent import LocalLLMAgent
 from backend.policy_loop import PolicyLoop
+from backend.poker_hands import (
+    card_image_path,
+    compare_hands,
+    create_deck,
+    evaluate_hand,
+    format_cards_ko,
+)
+from backend.script_bot import SimpleScriptBot
 
 
-RANKS = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "Jack", "Queen", "King", "Ace"]
-SUITS = ["Hearts", "Diamonds", "Clubs", "Spades"]
-RANK_VALUES = {rank: index + 2 for index, rank in enumerate(RANKS)}
-SUIT_NAMES_KO = {
-    "Hearts": "하트",
-    "Diamonds": "다이아",
-    "Clubs": "클로버",
-    "Spades": "스페이드",
-}
-HAND_NAMES_KO = {
-    9: "로열 플러시",
-    8: "스트레이트 플러시",
-    7: "포카드",
-    6: "풀하우스",
-    5: "플러시",
-    4: "스트레이트",
-    3: "트리플",
-    2: "투페어",
-    1: "원페어",
-    0: "하이카드",
-}
 PHASE_NAMES_KO = {
     "betting1": "첫 번째 베팅",
     "draw": "드로우",
@@ -39,16 +24,17 @@ PHASE_NAMES_KO = {
 
 @dataclass
 class PlayerState:
-    """PlayerState, 한 플레이어의 현재 포커 상태를 담는다.
+    """
+    한 플레이어의 스택, 손패, 폴드 여부를 묶어 보관한다.
 
     Args:
-        name: 플레이어 이름.
-        stack: 현재 칩 수.
-        hand: 현재 손패 목록.
-        folded: 폴드 여부.
+        name: 화면과 로그에 표시할 플레이어 이름이다.
+        stack: 현재 보유 칩 수다.
+        hand: 현재 손패다.
+        folded: 이번 라운드에서 폴드했는지 여부다.
 
     Returns:
-        PlayerState: 플레이어 상태 객체.
+        없음. 데이터 보관용 상태 객체를 만든다.
     """
 
     name: str
@@ -56,281 +42,36 @@ class PlayerState:
     hand: list = field(default_factory=list)
     folded: bool = False
 
-
-def format_card_ko(card):
-    """format_card_ko, 카드 한 장을 한국어 문자열로 변환한다.
-
-    Args:
-        card: `(rank, suit)` 형식의 카드 튜플.
-
-    Returns:
-        str: 한국어 카드 표시 문자열.
-    """
-
-    rank, suit = card
-    return "%s %s" % (SUIT_NAMES_KO[suit], rank)
-
-
-def format_cards_ko(cards):
-    """format_cards_ko, 카드 목록을 한국어 문자열로 합친다.
-
-    Args:
-        cards: 카드 튜플 목록.
-
-    Returns:
-        str: 카드 목록 표시 문자열.
-    """
-
-    return ", ".join(format_card_ko(card) for card in cards)
-
-
-def card_image_path(card, state="idle"):
-    """card_image_path, 카드 이미지 리소스 경로를 계산한다.
-
-    Args:
-        card: `(rank, suit)` 형식의 카드 튜플.
-        state: 카드 이미지 상태 문자열.
-
-    Returns:
-        str: Ren'Py 이미지 경로 문자열.
-    """
-
-    rank, suit = card
-    return "images/minigames/poker_minigame/%s_%s_%s.png" % (rank, suit.lower(), state)
-
-
-def create_deck():
-    """create_deck, 셔플된 52장 덱을 생성한다.
-
-    Args:
-        없음.
-
-    Returns:
-        list: 셔플된 카드 튜플 목록.
-    """
-
-    deck = [(rank, suit) for rank in RANKS for suit in SUITS]
-    random.shuffle(deck)
-    return deck
-
-
-def straight_high(values):
-    """straight_high, 스트레이트의 최고 숫자를 계산한다.
-
-    Args:
-        values: 카드 숫자 값 목록.
-
-    Returns:
-        int | None: 스트레이트 최고값 또는 스트레이트가 아닐 때 None.
-    """
-
-    unique_values = sorted(set(values))
-    if len(unique_values) != 5:
-        return None
-    if unique_values == [2, 3, 4, 5, 14]:
-        return 5
-    if unique_values[-1] - unique_values[0] == 4:
-        return unique_values[-1]
-    return None
-
-
-def evaluate_hand(hand):
-    """evaluate_hand, 5장 손패의 족보와 타이브레이커를 계산한다.
-
-    Args:
-        hand: 카드 5장 튜플 목록.
-
-    Returns:
-        tuple: `(족보 순위, 타이브레이커 튜플, 한국어 족보명)`.
-    """
-
-    if len(hand) != 5:
-        return 0, tuple(), "미정"
-
-    values = [RANK_VALUES[rank] for rank, _ in hand]
-    suits = [suit for _, suit in hand]
-    counts = Counter(values)
-    by_count_then_value = sorted(
-        counts.items(),
-        key=lambda item: (item[1], item[0]),
-        reverse=True,
-    )
-    is_flush = len(set(suits)) == 1
-    straight = straight_high(values)
-
-    if is_flush and straight == 14 and sorted(values) == [10, 11, 12, 13, 14]:
-        return 9, (14,), HAND_NAMES_KO[9]
-    if is_flush and straight:
-        return 8, (straight,), HAND_NAMES_KO[8]
-    if by_count_then_value[0][1] == 4:
-        quad = by_count_then_value[0][0]
-        kicker = [value for value in values if value != quad][0]
-        return 7, (quad, kicker), HAND_NAMES_KO[7]
-    if by_count_then_value[0][1] == 3 and by_count_then_value[1][1] == 2:
-        return 6, (by_count_then_value[0][0], by_count_then_value[1][0]), HAND_NAMES_KO[6]
-    if is_flush:
-        return 5, tuple(sorted(values, reverse=True)), HAND_NAMES_KO[5]
-    if straight:
-        return 4, (straight,), HAND_NAMES_KO[4]
-    if by_count_then_value[0][1] == 3:
-        trip = by_count_then_value[0][0]
-        kickers = sorted([value for value in values if value != trip], reverse=True)
-        return 3, tuple([trip] + kickers), HAND_NAMES_KO[3]
-    if by_count_then_value[0][1] == 2 and by_count_then_value[1][1] == 2:
-        pair_values = sorted([value for value, count in counts.items() if count == 2], reverse=True)
-        kicker = [value for value, count in counts.items() if count == 1][0]
-        return 2, tuple(pair_values + [kicker]), HAND_NAMES_KO[2]
-    if by_count_then_value[0][1] == 2:
-        pair_value = by_count_then_value[0][0]
-        kickers = sorted([value for value in values if value != pair_value], reverse=True)
-        return 1, tuple([pair_value] + kickers), HAND_NAMES_KO[1]
-    return 0, tuple(sorted(values, reverse=True)), HAND_NAMES_KO[0]
-
-
-def compare_hands(player_hand, bot_hand):
-    """compare_hands, 두 손패를 비교해 승자를 판정한다.
-
-    Args:
-        player_hand: 플레이어 손패.
-        bot_hand: 봇 손패.
-
-    Returns:
-        tuple: `(승자 식별자, 플레이어 평가 결과, 봇 평가 결과)`.
-    """
-
-    player_rank = evaluate_hand(player_hand)
-    bot_rank = evaluate_hand(bot_hand)
-    if player_rank[0] > bot_rank[0]:
-        return "player", player_rank, bot_rank
-    if player_rank[0] < bot_rank[0]:
-        return "bot", player_rank, bot_rank
-    if player_rank[1] > bot_rank[1]:
-        return "player", player_rank, bot_rank
-    if player_rank[1] < bot_rank[1]:
-        return "bot", player_rank, bot_rank
-    return "tie", player_rank, bot_rank
-
-
-class SimpleScriptBot:
-    """SimpleScriptBot, 현재 구현에서 사용하는 규칙 기반 스크립트 상대다.
-
-    Args:
-        없음.
-
-    Returns:
-        SimpleScriptBot: 스크립트봇 객체.
-    """
-
-    def choose_open_action(self, hand, phase, bet_size):
-        """choose_open_action, 베팅을 먼저 열 때 행동을 결정한다.
-
-        Args:
-            hand: 봇 손패.
-            phase: 현재 베팅 페이즈.
-            bet_size: 고정 베팅 금액.
-
-        Returns:
-            str: `check` 또는 `bet`.
-        """
-
-        rank_value, _, _ = evaluate_hand(hand)
-        if rank_value >= 1:
-            return "bet"
-        if phase == "betting2" and random.random() < 0.2:
-            return "bet"
-        return "check"
-
-    def choose_response_action(self, hand, phase, to_call, can_raise, raise_size):
-        """choose_response_action, 상대 베팅에 대한 응답 행동을 결정한다.
-
-        Args:
-            hand: 봇 손패.
-            phase: 현재 베팅 페이즈.
-            to_call: 현재 맞춰야 할 금액.
-            can_raise: 현재 레이즈 가능 여부.
-            raise_size: 현재 레이즈 단위 금액.
-
-        Returns:
-            str: `call`, `raise`, `fold` 중 하나.
-        """
-
-        rank_value, tiebreak, _ = evaluate_hand(hand)
-        high_card = max(tiebreak) if tiebreak else 0
-        if can_raise and rank_value >= 2:
-            return "raise"
-        if can_raise and rank_value == 1 and high_card >= 11 and random.random() < 0.35:
-            return "raise"
-        if rank_value >= 1:
-            return "call"
-        if phase == "betting1" and high_card >= 13 and to_call <= raise_size and random.random() < 0.45:
-            return "call"
-        if phase == "betting2" and high_card >= 14 and to_call <= raise_size * 2 and random.random() < 0.2:
-            return "call"
-        return "fold"
-
-    def choose_discards(self, hand, max_discards):
-        """choose_discards, 드로우 단계에서 버릴 카드 인덱스를 고른다.
-
-        Args:
-            hand: 봇 손패.
-            max_discards: 최대 교체 가능 장수.
-
-        Returns:
-            list: 버릴 카드 인덱스 목록.
-        """
-
-        rank_value, _, _ = evaluate_hand(hand)
-        values = [RANK_VALUES[rank] for rank, _ in hand]
-        counts = Counter(values)
-
-        if rank_value >= 4:
-            return []
-        if rank_value == 3:
-            trip_value = [value for value, count in counts.items() if count == 3][0]
-            return [index for index, card in enumerate(hand) if RANK_VALUES[card[0]] != trip_value][:max_discards]
-        if rank_value == 2:
-            kicker_value = [value for value, count in counts.items() if count == 1][0]
-            return [index for index, card in enumerate(hand) if RANK_VALUES[card[0]] == kicker_value][:1]
-        if rank_value == 1:
-            pair_value = [value for value, count in counts.items() if count == 2][0]
-            return [index for index, card in enumerate(hand) if RANK_VALUES[card[0]] != pair_value][:max_discards]
-
-        sorted_indexes = sorted(
-            range(len(hand)),
-            key=lambda idx: RANK_VALUES[hand[idx][0]],
-        )
-        return sorted_indexes[:max_discards]
-
-
 class PokerMatch:
-    """PokerMatch, v1 2인 5드로우 포커 라운드 진행을 관리한다.
+    """
+    2인 5드로우 포커 매치의 상태기계와 라운드 진행을 관리한다.
 
     Args:
-        config: 백엔드 설정 객체.
-        memory_manager: 기억 저장 객체.
-        replay_logger: 리플레이 저장 객체.
-        player_name: 인간 플레이어 이름.
-        bot_name: 상대 봇 이름.
+        config: 게임 규칙과 LLM 실행 설정을 담은 백엔드 설정 객체다.
+        memory_manager: LLM NPC 기억 저장소다.
+        replay_logger: 라운드 결과 저장소다.
+        player_name: 플레이어 표시 이름이다.
+        bot_name: 상대 기본 표시 이름이다.
 
     Returns:
-        PokerMatch: 라운드 진행 객체.
+        없음. 매치 진행용 인스턴스를 초기화한다.
     """
 
     def __init__(self, config, memory_manager, replay_logger, player_name="플레이어", bot_name="스크립트봇"):
         self.config = config
         self.memory_manager = memory_manager
         self.replay_logger = replay_logger
-        self.policy_loop = PolicyLoop(memory_manager)
+        self.llm_agent = LocalLLMAgent(
+            config.local_llm_path,
+            config.llm_model_name,
+            config.llm_runner_python,
+            config.llm_device,
+            memory_manager,
+        )
+        self.policy_loop = PolicyLoop(memory_manager, self.llm_agent)
         self.player = PlayerState(player_name, config.starting_stack)
         self.bot = PlayerState(bot_name, config.starting_stack)
         self.script_bot = SimpleScriptBot()
-        self.llm_agent = LocalLLMAgent(
-            config.local_llm_path,
-            config.llm_runner_python,
-            memory_manager,
-            config.llm_backend,
-            config.llm_quantization,
-        )
         self.bot_mode = config.bot_mode
         self.hand_no = 0
         self.phase = "finished"
@@ -353,37 +94,40 @@ class PokerMatch:
         self._apply_bot_mode_name()
 
     def _debug_terminal_log(self, message):
-        """_debug_terminal_log, 게임 UI와 분리된 터미널 전용 디버그 로그를 출력한다.
+        """
+        게임 화면에는 보이지 않는 디버그 정보를 터미널에 남긴다.
 
         Args:
-            message: 터미널에 출력할 로그 문자열.
+            message: 터미널에 찍을 디버그 문자열이다.
 
         Returns:
-            None: 표준 에러로 즉시 로그를 출력한다.
+            없음. stderr에 로그 한 줄을 기록한다.
         """
 
         print("[LLMoker][DEBUG] %s" % message, file=sys.stderr, flush=True)
 
     def can_continue_match(self):
-        """can_continue_match, 다음 라운드를 시작할 칩이 남아 있는지 확인한다.
+        """
+        양쪽 모두 다음 라운드 앤티를 낼 수 있는지 확인한다.
 
         Args:
             없음.
 
         Returns:
-            bool: 다음 라운드 시작 가능 여부.
+            다음 라운드를 시작할 수 있으면 `True`다.
         """
 
         return self.player.stack >= self.config.ante and self.bot.stack >= self.config.ante
 
     def to_snapshot(self):
-        """to_snapshot, 현재 매치 상태를 저장 가능한 사전으로 변환한다.
+        """
+        현재 매치 상태를 저장소에 넣기 쉬운 사전으로 직렬화한다.
 
         Args:
             없음.
 
         Returns:
-            dict: 세이브 파일에 넣을 수 있는 단순 상태 사전.
+            세이브 복원에 필요한 매치 상태 사전이다.
         """
 
         return {
@@ -414,22 +158,23 @@ class PokerMatch:
             "latest_feedback": self.latest_feedback,
             "bot_mode": self.bot_mode,
             "last_llm_reason": self.last_llm_reason,
-            "llm_backend": self.config.llm_backend,
-            "llm_quantization": self.config.llm_quantization,
+            "llm_model_name": self.config.llm_model_name,
+            "llm_device": self.config.llm_device,
         }
 
     @classmethod
     def from_snapshot(cls, config, memory_manager, replay_logger, snapshot):
-        """from_snapshot, 저장된 스냅샷으로 매치 객체를 복원한다.
+        """
+        저장해 둔 스냅샷을 바탕으로 매치 객체를 다시 만든다.
 
         Args:
-            config: 백엔드 설정 객체.
-            memory_manager: 기억 저장 객체.
-            replay_logger: 리플레이 저장 객체.
-            snapshot: 세이브에서 읽은 상태 사전.
+            config: 현재 세션의 백엔드 설정 객체다.
+            memory_manager: 기억 저장소다.
+            replay_logger: 리플레이 저장소다.
+            snapshot: 이전에 직렬화해 둔 매치 상태 사전이다.
 
         Returns:
-            PokerMatch: 복원된 매치 객체.
+            스냅샷 상태를 복원한 `PokerMatch` 인스턴스다.
         """
 
         match = cls(
@@ -464,35 +209,37 @@ class PokerMatch:
         match.latest_feedback = snapshot["latest_feedback"]
         match.bot_mode = snapshot.get("bot_mode", config.bot_mode)
         match.last_llm_reason = snapshot.get("last_llm_reason", "")
-        match.config.llm_backend = snapshot.get("llm_backend", config.llm_backend)
-        match.config.llm_quantization = snapshot.get("llm_quantization", config.llm_quantization)
+        match.config.llm_model_name = snapshot.get("llm_model_name", config.llm_model_name)
+        match.config.llm_device = snapshot.get("llm_device", config.llm_device)
         match.llm_agent.reconfigure(
-            llm_backend=match.config.llm_backend,
-            llm_quantization=match.config.llm_quantization,
+            llm_model_name=match.config.llm_model_name,
+            llm_device=match.config.llm_device,
         )
         match._apply_bot_mode_name()
         return match
 
     def phase_name_ko(self):
-        """phase_name_ko, 현재 페이즈의 한국어 이름을 반환한다.
+        """
+        현재 내부 페이즈 코드를 화면 표시용 한국어 이름으로 바꾼다.
 
         Args:
             없음.
 
         Returns:
-            str: 현재 페이즈의 한국어 이름.
+            현재 페이즈를 설명하는 한국어 문자열이다.
         """
 
         return PHASE_NAMES_KO.get(self.phase, self.phase)
 
     def _apply_bot_mode_name(self):
-        """_apply_bot_mode_name, 현재 봇 모드에 맞는 표시 이름을 적용한다.
+        """
+        현재 상대 AI 모드에 맞춰 봇 표시 이름을 갱신한다.
 
         Args:
             없음.
 
         Returns:
-            None: 봇 표시 이름을 갱신한다.
+            없음. `self.bot.name`만 갱신한다.
         """
 
         if self.bot_mode == "llm_npc":
@@ -501,13 +248,14 @@ class PokerMatch:
             self.bot.name = "스크립트봇"
 
     def set_bot_mode(self, bot_mode):
-        """set_bot_mode, 현재 매치에서 사용할 상대 AI 모드를 변경한다.
+        """
+        현재 매치에서 사용할 상대 AI 모드를 바꾸고 표시 이름도 맞춘다.
 
         Args:
-            bot_mode: `script_bot` 또는 `llm_npc`.
+            bot_mode: 적용할 상대 AI 모드 문자열이다.
 
         Returns:
-            None: 봇 모드와 표시 이름을 갱신한다.
+            없음. 매치와 설정 객체의 봇 모드를 함께 갱신한다.
         """
 
         self.bot_mode = bot_mode
@@ -515,13 +263,14 @@ class PokerMatch:
         self._apply_bot_mode_name()
 
     def get_bot_mode_label(self):
-        """get_bot_mode_label, 현재 상대 AI 모드의 표시명을 반환한다.
+        """
+        현재 상대 AI 모드를 화면용 한국어 라벨로 돌려준다.
 
         Args:
             없음.
 
         Returns:
-            str: UI에 표시할 상대 AI 모드 문자열.
+            현재 상대 AI 표시 문자열이다.
         """
 
         if self.bot_mode == "llm_npc":
@@ -529,56 +278,53 @@ class PokerMatch:
         return "스크립트봇"
 
     def get_llm_status_text(self):
-        """get_llm_status_text, 현재 LLM 워커 상태 설명을 반환한다.
+        """
+        현재 LLM 워커 상태를 Ren'Py 화면에 안전하게 올릴 문자열로 바꾼다.
 
         Args:
             없음.
 
         Returns:
-            str: LLM 상태 문자열.
+            중괄호를 이스케이프한 상태 문자열이다.
         """
 
         return self.llm_agent.last_status.replace("{", "{{").replace("}", "}}")
 
-    def get_llm_backend_label(self):
-        """get_llm_backend_label, 현재 LLM 추론 백엔드 표시명을 반환한다.
+    def get_llm_runtime_label(self):
+        """
+        현재 LLM NPC 실행 방식을 화면에서 읽기 쉬운 라벨로 돌려준다.
 
         Args:
             없음.
 
         Returns:
-            str: UI에 표시할 백엔드 문자열.
+            LLM 실행 경로를 설명하는 문자열이다.
         """
 
-        active_backend = self.llm_agent.__class__._worker_backend or self.config.llm_backend
-        active_quantization = self.llm_agent.__class__._worker_quantization or self.config.llm_quantization
-
-        if active_backend == "vllm":
-            if active_quantization == "bitsandbytes":
-                return "vLLM 4비트"
-            return "vLLM"
-        return "Transformers"
+        return "Qwen-Agent(local transformers)"
 
     def format_bot_hand_for_prompt(self):
-        """format_bot_hand_for_prompt, LLM 프롬프트용 봇 손패 문자열 목록을 반환한다.
+        """
+        봇 손패를 프롬프트에 바로 넣기 쉬운 한국어 카드 문자열 목록으로 바꾼다.
 
         Args:
             없음.
 
         Returns:
-            list: 한국어 카드 문자열 목록.
+            봇 손패를 설명하는 문자열 목록이다.
         """
 
         return [format_card_ko(card) for card in self.bot.hand]
 
     def start_new_round(self):
-        """start_new_round, 새 포커 라운드를 초기화하고 시작 로그를 만든다.
+        """
+        새 라운드를 시작하면서 덱, 손패, 앤티, 로그, 베팅 상태를 초기화한다.
 
         Args:
             없음.
 
         Returns:
-            list: 라운드 시작 로그 문자열 목록.
+            라운드 시작 직후 화면과 로그에 보여 줄 메시지 목록이다.
         """
 
         if not self.can_continue_match():
@@ -622,25 +368,27 @@ class PokerMatch:
         return list(self.action_log)
 
     def get_player_hand(self):
-        """get_player_hand, 플레이어 손패를 반환한다.
+        """
+        플레이어 손패를 원본을 건드리지 않도록 복사해서 돌려준다.
 
         Args:
             없음.
 
         Returns:
-            list: 플레이어 카드 목록.
+            플레이어 손패 카드 목록 사본이다.
         """
 
         return list(self.player.hand)
 
     def get_bot_hand(self, reveal=False):
-        """get_bot_hand, 봇 손패를 반환하거나 비공개 카드로 가린다.
+        """
+        현재 상황에 따라 봇 손패를 공개하거나 뒷면 카드로 가려서 돌려준다.
 
         Args:
-            reveal: 실제 손패 공개 여부.
+            reveal: 실제 손패를 그대로 보여 줄지 여부다.
 
         Returns:
-            list: 실제 손패 또는 숨김 표시 카드 목록.
+            실제 봇 손패 또는 비공개 카드 자리표시 목록이다.
         """
 
         if reveal or self.round_over:
@@ -648,49 +396,53 @@ class PokerMatch:
         return [("Hidden", "Back")] * len(self.bot.hand)
 
     def get_player_hand_name(self):
-        """get_player_hand_name, 플레이어 현재 족보명을 반환한다.
+        """
+        플레이어 현재 손패의 족보 이름을 계산한다.
 
         Args:
             없음.
 
         Returns:
-            str: 한국어 족보명.
+            플레이어 족보의 한국어 이름이다.
         """
 
         return evaluate_hand(self.player.hand)[2]
 
     def get_bot_hand_name(self):
-        """get_bot_hand_name, 봇 현재 족보명을 반환한다.
+        """
+        봇 현재 손패의 족보 이름을 계산한다.
 
         Args:
             없음.
 
         Returns:
-            str: 한국어 족보명.
+            봇 족보의 한국어 이름이다.
         """
 
         return evaluate_hand(self.bot.hand)[2]
 
     def is_match_finished(self):
-        """is_match_finished, 현재 라운드 종료 후 매치가 끝났는지 확인한다.
+        """
+        라운드가 끝난 뒤 더 이상 다음 라운드를 열 수 없는지 확인한다.
 
         Args:
             없음.
 
         Returns:
-            bool: 다음 라운드를 시작할 수 없으면 True.
+            매치가 최종 종료 상태면 `True`다.
         """
 
         return self.round_over and not self.can_continue_match()
 
     def get_round_result_title(self):
-        """get_round_result_title, 라운드 종료 화면 제목을 반환한다.
+        """
+        종료 화면 맨 위에 표시할 승패 제목을 만든다.
 
         Args:
             없음.
 
         Returns:
-            str: 승패에 맞는 종료 제목 문자열.
+            라운드 종료 제목 문자열이다.
         """
 
         if not self.round_summary:
@@ -704,13 +456,14 @@ class PokerMatch:
         return "무승부"
 
     def get_round_result_message(self):
-        """get_round_result_message, 종료 화면의 핵심 결과 문구를 반환한다.
+        """
+        승자, 팟, 종료 방식에 맞춰 종료 화면 핵심 문구를 만든다.
 
         Args:
             없음.
 
         Returns:
-            str: 승패와 종료 방식이 정리된 결과 문구.
+            종료 패널 본문에 들어갈 결과 문구다.
         """
 
         if not self.round_summary:
@@ -734,13 +487,14 @@ class PokerMatch:
         return "%s 쇼다운에서 양쪽 패를 비교한 결과입니다." % base_message
 
     def get_match_result_message(self):
-        """get_match_result_message, 매치 종료 여부를 설명하는 문구를 반환한다.
+        """
+        매치가 끝났는지, 아니면 다음 라운드로 이어지는지 설명한다.
 
         Args:
             없음.
 
         Returns:
-            str: 다음 라운드 가능 여부 또는 매치 종료 문구.
+            매치 지속 여부를 알려 주는 문자열이다.
         """
 
         if self.is_match_finished():
@@ -752,73 +506,79 @@ class PokerMatch:
         return "다음 라운드를 계속 진행할 수 있습니다."
 
     def get_recent_log_text(self, limit=8):
-        """get_recent_log_text, 최근 로그를 화면 표시용 문자열로 합친다.
+        """
+        최근 로그를 화면 텍스트 박스에 넣기 좋게 여러 줄 문자열로 합친다.
 
         Args:
-            limit: 표시할 최대 로그 수.
+            limit: 뒤에서부터 몇 줄을 묶을지 정한다.
 
         Returns:
-            str: 줄바꿈으로 합쳐진 최근 로그 문자열.
+            줄바꿈으로 연결한 최근 로그 문자열이다.
         """
 
         return "\n".join(self.action_log[-limit:])
 
     def get_public_log_lines(self, limit=8):
-        """get_public_log_lines, 공개 정보만 담긴 최근 로그 목록을 반환한다.
+        """
+        플레이어와 NPC 모두가 볼 수 있는 공개 로그만 잘라서 돌려준다.
 
         Args:
-            limit: 표시할 최대 공개 로그 수.
+            limit: 뒤에서부터 몇 줄을 돌려줄지 정한다.
 
         Returns:
-            list: 공개 진행 정보 문자열 목록.
+            공개 로그 문자열 목록이다.
         """
 
         return list(self.public_log[-limit:])
 
     def is_player_turn(self):
-        """is_player_turn, 현재 베팅 페이즈에서 플레이어 차례인지 확인한다.
+        """
+        현재 상태에서 플레이어가 실제로 행동을 고를 차례인지 판정한다.
 
         Args:
             없음.
 
         Returns:
-            bool: 플레이어 차례면 True.
+            플레이어 턴이면 `True`다.
         """
 
         return self.phase in ("betting1", "betting2") and self.current_actor == "player" and not self.round_over
 
     def get_player_amount_to_call(self):
-        """get_player_amount_to_call, 플레이어가 맞춰야 할 현재 금액을 반환한다.
+        """
+        플레이어가 현재 베팅을 맞추기 위해 더 내야 할 칩 수를 계산한다.
 
         Args:
             없음.
 
         Returns:
-            int: 플레이어가 콜하기 위해 더 내야 하는 칩 수.
+            플레이어 기준 콜 금액이다.
         """
 
         return max(0, self.current_bet - self.player_contribution)
 
     def get_bot_amount_to_call(self):
-        """get_bot_amount_to_call, 봇이 맞춰야 할 현재 금액을 반환한다.
+        """
+        봇이 현재 베팅을 맞추기 위해 더 내야 할 칩 수를 계산한다.
 
         Args:
             없음.
 
         Returns:
-            int: 봇이 콜하기 위해 더 내야 하는 칩 수.
+            봇 기준 콜 금액이다.
         """
 
         return max(0, self.current_bet - self.bot_contribution)
 
     def get_player_available_actions(self):
-        """get_player_available_actions, 현재 플레이어가 선택 가능한 행동을 계산한다.
+        """
+        현재 플레이어 턴에서 실제로 선택할 수 있는 합법 행동만 계산한다.
 
         Args:
             없음.
 
         Returns:
-            list: 현재 플레이어에게 합법인 행동 문자열 목록.
+            플레이어 행동 문자열 목록이다.
         """
 
         if not self.is_player_turn():
@@ -826,37 +586,40 @@ class PokerMatch:
         return self._get_available_actions("player")
 
     def can_player_raise(self):
-        """can_player_raise, 현재 플레이어가 레이즈 가능한지 확인한다.
+        """
+        현재 플레이어 행동 목록 안에 레이즈가 포함되는지 확인한다.
 
         Args:
             없음.
 
         Returns:
-            bool: 플레이어 레이즈 가능 여부.
+            지금 레이즈가 가능하면 `True`다.
         """
 
         return "raise" in self.get_player_available_actions()
 
     def get_raise_total_amount(self):
-        """get_raise_total_amount, 플레이어가 레이즈 시 이번 턴에 내야 할 총액을 반환한다.
+        """
+        플레이어가 이번 턴에 레이즈를 택할 때 실제로 내야 할 총액을 계산한다.
 
         Args:
             없음.
 
         Returns:
-            int: 콜 금액과 추가 레이즈를 합친 총 지불 금액.
+            현재 콜 금액과 고정 베팅액을 합친 총 납입액이다.
         """
 
         return self.get_player_amount_to_call() + self.config.fixed_bet
 
     def get_betting_status_text(self):
-        """get_betting_status_text, 현재 베팅 라운드 정보를 설명하는 문구를 반환한다.
+        """
+        현재 베팅 상황을 HUD에 띄울 요약 문구로 만든다.
 
         Args:
             없음.
 
         Returns:
-            str: 맞춰야 할 금액과 남은 레이즈 횟수 설명.
+            콜 금액과 남은 레이즈 횟수를 담은 상태 문자열이다.
         """
 
         if self.phase not in ("betting1", "betting2"):
@@ -869,13 +632,14 @@ class PokerMatch:
         return "현재 체크 가능 / 남은 레이즈: %d회" % max(0, raises_left)
 
     def _start_betting_round(self, phase):
-        """_start_betting_round, 베팅 라운드 상태를 초기화한다.
+        """
+        지정한 베팅 페이즈로 넘어가며 베팅 라운드 상태를 초기화한다.
 
         Args:
-            phase: 시작할 베팅 페이즈 문자열.
+            phase: 시작할 베팅 페이즈 이름이다.
 
         Returns:
-            None: 베팅 상태를 초기화한다.
+            없음. 베팅 관련 카운터와 기여 금액을 초기화한다.
         """
 
         self.phase = phase
@@ -889,13 +653,14 @@ class PokerMatch:
         self.consecutive_checks = 0
 
     def _get_available_actions(self, actor_name):
-        """_get_available_actions, 지정 플레이어 기준 합법 행동 목록을 계산한다.
+        """
+        특정 주체 기준으로 지금 가능한 행동만 골라낸다.
 
         Args:
-            actor_name: `player` 또는 `bot`.
+            actor_name: `player` 또는 `bot` 중 하나다.
 
         Returns:
-            list: 현재 선택 가능한 행동 문자열 목록.
+            현재 상태에서 허용되는 행동 문자열 목록이다.
         """
 
         actor = self.player if actor_name == "player" else self.bot
@@ -920,27 +685,29 @@ class PokerMatch:
         return actions
 
     def _deduct(self, actor, amount):
-        """_deduct, 플레이어 칩을 차감하고 팟에 반영한다.
+        """
+        지정 플레이어 스택에서 칩을 빼고 팟에도 같은 금액을 더한다.
 
         Args:
-            actor: 칩을 낼 플레이어 상태 객체.
-            amount: 차감할 칩 수.
+            actor: 칩을 낼 플레이어 상태 객체다.
+            amount: 이번에 차감할 칩 수다.
 
         Returns:
-            None: 내부 상태만 갱신한다.
+            없음. 플레이어 스택과 팟만 갱신한다.
         """
 
         actor.stack -= amount
         self.pot += amount
 
     def _finish_by_fold(self, winner):
-        """_finish_by_fold, 폴드로 끝난 라운드를 마감 처리한다.
+        """
+        폴드로 라운드가 끝났을 때 승자 정산과 종료 요약을 처리한다.
 
         Args:
-            winner: 폴드로 승리한 플레이어 상태 객체.
+            winner: 폴드 승리를 가져갈 플레이어 상태 객체다.
 
         Returns:
-            None: 라운드 종료 상태를 갱신한다.
+            없음. 승자 스택과 라운드 종료 상태를 갱신한다.
         """
 
         winner.stack += self.pot
@@ -957,13 +724,14 @@ class PokerMatch:
             ))
 
     def _advance_after_betting(self):
-        """_advance_after_betting, 베팅 완료 후 다음 페이즈로 진행한다.
+        """
+        현재 베팅 라운드가 끝났을 때 다음 페이즈로 넘기거나 쇼다운을 연다.
 
         Args:
             없음.
 
         Returns:
-            None: 다음 페이즈 또는 쇼다운으로 진행한다.
+            다음 페이즈 전환 과정에서 화면에 보여 줄 메시지 목록이다.
         """
 
         if self.phase == "betting1":
@@ -974,13 +742,14 @@ class PokerMatch:
         return []
 
     def resolve_player_action(self, action):
-        """resolve_player_action, 플레이어의 현재 베팅 행동을 적용한다.
+        """
+        플레이어가 선택한 베팅 행동을 적용하고 필요하면 봇 턴까지 이어서 진행한다.
 
         Args:
-            action: 플레이어가 선택한 행동 문자열.
+            action: 플레이어가 고른 행동 문자열이다.
 
         Returns:
-            list: 처리 결과 로그 문자열 목록.
+            이번 입력으로 발생한 로그 메시지 목록이다.
         """
 
         if self.phase not in ("betting1", "betting2") or self.round_over or not self.is_player_turn():
@@ -994,14 +763,15 @@ class PokerMatch:
         return messages
 
     def _apply_betting_action(self, actor_name, action):
-        """_apply_betting_action, 현재 베팅 라운드의 한 행동을 적용한다.
+        """
+        한 주체의 체크, 베팅, 콜, 레이즈, 폴드를 실제 상태에 반영한다.
 
         Args:
-            actor_name: 행동 주체 식별자.
-            action: 적용할 행동 문자열.
+            actor_name: 행동 주체를 나타내는 `player` 또는 `bot`이다.
+            action: 적용할 행동 문자열이다.
 
         Returns:
-            list: 적용 결과 로그 문자열 목록.
+            행동 적용 중 발생한 로그 메시지 목록이다.
         """
 
         actor = self.player if actor_name == "player" else self.bot
@@ -1098,13 +868,14 @@ class PokerMatch:
         return ["알 수 없는 행동입니다."]
 
     def _run_bot_turns(self):
-        """_run_bot_turns, 플레이어 차례가 돌아오거나 페이즈가 끝날 때까지 봇 행동을 처리한다.
+        """
+        플레이어 턴이 돌아오거나 라운드가 끝날 때까지 봇 턴을 연속 처리한다.
 
         Args:
             없음.
 
         Returns:
-            list: 봇 행동과 결과 로그 문자열 목록.
+            봇 턴 동안 누적된 로그 메시지 목록이다.
         """
 
         messages = []
@@ -1121,6 +892,16 @@ class PokerMatch:
                     )
                 )
                 llm_choice = self.llm_agent.choose_action(self, actions)
+                if llm_choice.get("status") != "ok":
+                    self.last_llm_reason = llm_choice.get("reason", "LLM 행동 선택 실패")
+                    self._debug_terminal_log(
+                        "%s 행동 선택 실패 / 이유: %s / 상태: %s" % (
+                            self.bot.name,
+                            self.last_llm_reason,
+                            self.llm_agent.last_status,
+                        )
+                    )
+                    raise RuntimeError("LLM NPC 행동 선택 실패: %s" % self.last_llm_reason)
                 bot_action = llm_choice["action"]
                 self.last_llm_reason = llm_choice.get("reason", "")
                 llm_log = "[LLM NPC] %s 행동 선택: %s / 이유: %s" % (
@@ -1168,13 +949,14 @@ class PokerMatch:
         return messages
 
     def resolve_draw_phase(self, discard_indexes):
-        """resolve_draw_phase, 플레이어와 봇의 카드 교체를 처리한다.
+        """
+        플레이어 교체 선택을 적용하고, 이어서 봇 교체까지 처리한다.
 
         Args:
-            discard_indexes: 플레이어가 교체할 카드 인덱스 목록.
+            discard_indexes: 플레이어가 교체할 카드 인덱스 목록이다.
 
         Returns:
-            list: 드로우 결과 로그 문자열 목록.
+            드로우 단계에서 발생한 로그 메시지 목록이다.
         """
 
         messages = []
@@ -1202,6 +984,15 @@ class PokerMatch:
                 )
             )
             draw_choice = self.llm_agent.choose_discards(self, self.config.max_discards)
+            if draw_choice.get("status") != "ok":
+                self._debug_terminal_log(
+                    "%s 카드 교체 판단 실패 / 이유: %s / 상태: %s" % (
+                        self.bot.name,
+                        draw_choice.get("reason", "LLM 교체 판단 실패"),
+                        self.llm_agent.last_status,
+                    )
+                )
+                raise RuntimeError("LLM NPC 카드 교체 판단 실패: %s" % draw_choice.get("reason", "LLM 교체 판단 실패"))
             bot_discards = draw_choice["discard_indexes"]
             llm_draw_log = "[LLM NPC] %s 카드 교체 판단: %s / 이유: %s" % (
                 self.bot.name,
@@ -1241,27 +1032,29 @@ class PokerMatch:
         return messages
 
     def _replace_cards(self, actor, discard_indexes):
-        """_replace_cards, 지정한 카드 인덱스를 새 카드로 교체한다.
+        """
+        지정한 카드 인덱스만 새 카드로 바꿔 손패를 갱신한다.
 
         Args:
-            actor: 카드를 교체할 플레이어 상태 객체.
-            discard_indexes: 교체할 카드 인덱스 목록.
+            actor: 카드를 교체할 플레이어 상태 객체다.
+            discard_indexes: 교체할 손패 인덱스 목록이다.
 
         Returns:
-            None: 손패를 내부적으로 교체한다.
+            없음. 대상 손패를 직접 수정한다.
         """
 
         for index in discard_indexes:
             actor.hand[index] = self.deck.pop()
 
     def _resolve_showdown(self):
-        """_resolve_showdown, 쇼다운을 처리하고 승자를 정산한다.
+        """
+        양쪽 손패를 비교해 승자를 정하고 팟을 정산한다.
 
         Args:
             없음.
 
         Returns:
-            list: 쇼다운 결과 로그 문자열 목록.
+            쇼다운 공개와 정산 과정에서 생긴 로그 메시지 목록이다.
         """
 
         result, player_rank, bot_rank = compare_hands(self.player.hand, self.bot.hand)
@@ -1308,14 +1101,15 @@ class PokerMatch:
         return messages
 
     def _finalize_round_summary(self, winner_name, folded):
-        """_finalize_round_summary, 라운드 결과 요약과 기억/리플레이를 저장한다.
+        """
+        라운드 종료 요약을 만들고 기억 저장과 리플레이 기록까지 마친다.
 
         Args:
-            winner_name: 승자 이름.
-            folded: 폴드 종료 여부.
+            winner_name: 이번 라운드 승자 이름이다.
+            folded: 폴드 종료 여부다.
 
         Returns:
-            None: 요약 저장과 메모리 업데이트를 수행한다.
+            없음. 종료 요약, 기억, 리플레이를 모두 갱신한다.
         """
 
         self.round_over = True
@@ -1335,17 +1129,33 @@ class PokerMatch:
             "ended_by_fold": folded,
             "log": list(self.action_log),
         }
-        self.latest_feedback = self.policy_loop.persist_feedback(self.round_summary)
+        self.latest_feedback = self.policy_loop.persist_feedback(
+            self.round_summary,
+            self.public_log,
+            self.bot_mode,
+        )
+        if self.bot_mode == "llm_npc" and self.latest_feedback:
+            feedback_status = self.latest_feedback.get("status", "ok")
+            self._debug_terminal_log(
+                "%s 정책 피드백 %s / 단기: %s / 장기: %s / 초점: %s" % (
+                    self.bot.name,
+                    "실패" if feedback_status == "error" else "완료",
+                    self.latest_feedback.get("short_term", ""),
+                    self.latest_feedback.get("long_term", ""),
+                    self.latest_feedback.get("strategy_focus", ""),
+                )
+            )
         self.replay_logger.append_round(self.round_summary)
 
     def get_round_summary_lines(self):
-        """get_round_summary_lines, 라운드 종료 요약을 화면 문자열로 만든다.
+        """
+        라운드 종료 결과를 로그나 팝업에 넣기 쉬운 문자열 목록으로 만든다.
 
         Args:
             없음.
 
         Returns:
-            list: 라운드 결과 표시 문자열 목록.
+            종료 화면에 쓸 요약 문자열 목록이다.
         """
 
         if not self.round_summary:
@@ -1365,4 +1175,6 @@ class PokerMatch:
         ]
         if self.latest_feedback:
             lines.append("전략 피드백: %s" % self.latest_feedback["short_term"])
+            if self.latest_feedback.get("strategy_focus"):
+                lines.append("다음 전략 초점: %s" % self.latest_feedback["strategy_focus"])
         return lines

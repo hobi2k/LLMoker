@@ -8,18 +8,20 @@ if ROOT not in sys.path:
 
 from backend.config import load_backend_config
 from backend.memory_manager import MemoryManager
-from backend.poker_engine import PokerMatch, evaluate_hand
+from backend.poker_engine import PokerMatch
+from backend.poker_hands import evaluate_hand
 from backend.replay_logger import ReplayLogger
 
 
 def scripted_player_betting_action(match):
-    """scripted_player_betting_action, CLI 테스트용 플레이어 베팅 행동을 정한다.
+    """
+    CLI 테스트용 플레이어 베팅 행동을 정한다.
 
     Args:
-        match: 현재 포커 매치 객체.
+        match: 현재 포커 매치 객체다.
 
     Returns:
-        str: 현재 합법 행동 중 하나.
+        플레이어 행동 문자열이다.
     """
 
     legal_actions = match.get_player_available_actions()
@@ -42,16 +44,18 @@ def scripted_player_betting_action(match):
 
 
 def main():
-    """main, 스크립트봇과 자동 플레이어의 한 판 테스트를 실행한다.
+    """
+    스크립트봇과 자동 플레이어의 한 판 테스트를 실행한다.
 
     Args:
         없음.
 
     Returns:
-        None: 콘솔에 진행 로그와 결과를 출력한다.
+        없음.
     """
 
     config = load_backend_config(ROOT)
+    config.bot_mode = "script_bot"
     memory_manager = MemoryManager(config.memory_db_path)
     replay_logger = ReplayLogger(config.replay_db_path)
     match = PokerMatch(config, memory_manager, replay_logger)

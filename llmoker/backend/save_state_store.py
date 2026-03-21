@@ -6,13 +6,14 @@ from backend.sqlite_compat import sqlite
 
 
 class SaveStateStore:
-    """SaveStateStore, SQLite에 세이브 슬롯을 저장하고 불러온다.
+    """
+    SQLite에 세이브 슬롯을 저장하고 불러온다.
 
     Args:
-        db_path: 세이브 상태 SQLite 파일 경로.
+        db_path: 세이브 SQLite 파일 경로다.
 
     Returns:
-        SaveStateStore: 세이브 슬롯 저장소 객체.
+        없음.
     """
 
     def __init__(self, db_path):
@@ -21,25 +22,27 @@ class SaveStateStore:
         self._initialize_db()
 
     def _connect(self):
-        """_connect, SQLite 연결을 생성한다.
+        """
+        SQLite 연결을 생성한다.
 
         Args:
             없음.
 
         Returns:
-            sqlite.Connection: SQLite 연결 객체.
+            현재 세이브 DB 연결 객체다.
         """
 
         return sqlite.connect(self.db_path)
 
     def _initialize_db(self):
-        """_initialize_db, 세이브 슬롯 테이블을 초기화한다.
+        """
+        세이브 슬롯 테이블을 초기화한다.
 
         Args:
             없음.
 
         Returns:
-            None: 테이블을 생성한다.
+            없음.
         """
 
         with self._connect() as connection:
@@ -55,15 +58,16 @@ class SaveStateStore:
             )
 
     def save_slot(self, slot, label, snapshot):
-        """save_slot, 지정 슬롯에 세이브 스냅샷을 저장한다.
+        """
+        지정 슬롯에 세이브 스냅샷을 저장한다.
 
         Args:
-            slot: 저장 슬롯 번호.
-            label: 슬롯 표시용 이름.
-            snapshot: 저장할 매치 상태 사전.
+            slot: 저장할 슬롯 번호다.
+            label: 화면 표시용 슬롯 이름이다.
+            snapshot: 저장할 게임 상태 사전이다.
 
         Returns:
-            None: 슬롯 내용을 SQLite에 저장한다.
+            없음.
         """
 
         payload = json.dumps(snapshot, ensure_ascii=False)
@@ -82,13 +86,14 @@ class SaveStateStore:
             )
 
     def load_slot(self, slot):
-        """load_slot, 지정 슬롯의 세이브 스냅샷을 불러온다.
+        """
+        지정 슬롯의 세이브 스냅샷을 불러온다.
 
         Args:
-            slot: 불러올 슬롯 번호.
+            slot: 불러올 슬롯 번호다.
 
         Returns:
-            dict | None: 저장된 스냅샷 또는 없을 때 None.
+            스냅샷 사전 또는 None이다.
         """
 
         with self._connect() as connection:
@@ -101,13 +106,14 @@ class SaveStateStore:
         return json.loads(row[0])
 
     def list_slots(self):
-        """list_slots, 화면 표시용 슬롯 목록을 반환한다.
+        """
+        화면 표시용 슬롯 목록을 반환한다.
 
         Args:
             없음.
 
         Returns:
-            list: 슬롯 메타데이터 목록.
+            슬롯 정보 사전 목록이다.
         """
 
         slot_map = {slot: {"slot": slot, "label": "빈 슬롯", "updated_at": ""} for slot in range(1, 4)}

@@ -1,6 +1,7 @@
 label poker_minigame:
     $ renpy.block_rollback()
     $ quick_menu = False
+    $ poker_fatal_error_text = ""
     window hide
     if not poker_match_intro_seen:
         $ play_dialogue_event("match_intro")
@@ -18,21 +19,23 @@ label poker_phase_loop:
     if get_poker_match().phase == "betting1" or get_poker_match().phase == "betting2":
         $ poker_status_text = get_poker_match().get_betting_status_text()
         $ action = renpy.call_screen("poker_table_screen", mode="betting")
-        $ round_messages = get_poker_match().resolve_player_action(action)
+        $ round_messages = safe_resolve_player_action(action)
+        if poker_fatal_error_text:
+            jump poker_runtime_error
 
         $ update_status_from_messages(round_messages, fallback="행동을 완료했습니다.")
         $ play_dialogue_event("betting", round_messages)
-        $ sync_poker_match_state()
         jump poker_phase_loop
 
     if get_poker_match().phase == "draw":
         $ poker_status_text = "드로우 단계입니다. 최대 %d장까지 교체할 수 있습니다." % get_poker_match().config.max_discards
         $ draw_action = renpy.call_screen("poker_table_screen", mode="draw")
         $ play_dialogue_event("draw")
-        $ round_messages = get_poker_match().resolve_draw_phase(poker_selected_discards)
+        $ round_messages = safe_resolve_draw_phase(poker_selected_discards)
         $ poker_selected_discards = []
+        if poker_fatal_error_text:
+            jump poker_runtime_error
         $ update_status_from_messages(round_messages, fallback="드로우를 완료했습니다.")
-        $ sync_poker_match_state()
         jump poker_phase_loop
 
     jump poker_round_end
@@ -54,3 +57,10 @@ label poker_round_end:
 label after_load:
     $ ensure_poker_runtime()
     return
+
+label poker_runtime_error:
+    window show
+    "LLM NPC 실행 중 오류가 발생했습니다."
+    "[poker_fatal_error_text]"
+    "메인 메뉴로 돌아갑니다."
+    jump main_menu

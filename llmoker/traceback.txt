@@ -1,57 +1,42 @@
 ﻿I'm sorry, but an uncaught exception occurred.
 
 While running game code:
-  File "game/poker_minigame.rpy", line 20, in script
-    $ action = renpy.call_screen("poker_table_screen", mode="betting")
-  File "game/poker_minigame.rpy", line 20, in <module>
-    $ action = renpy.call_screen("poker_table_screen", mode="betting")
-Exception: Empty text tag in 'LLM 상태: Engine core initialization failed. See root cause above. Failed core proc(s): {}'.
+  File "game/poker_minigame.rpy", line 7, in script
+    $ play_dialogue_event("match_intro")
+  File "game/poker_minigame.rpy", line 7, in <module>
+    $ play_dialogue_event("match_intro")
+  File "game/poker_dialogue.rpy", line 166, in play_dialogue_event
+    renpy.say(speaker, safe_text)
+ValueError: Invalid format specifier
 
 -- Full Traceback ------------------------------------------------------------
 
 Full traceback:
-  File "game/poker_minigame.rpy", line 20, in script
-    $ action = renpy.call_screen("poker_table_screen", mode="betting")
+  File "game/poker_minigame.rpy", line 7, in script
+    $ play_dialogue_event("match_intro")
   File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/ast.py", line 823, in execute
     renpy.python.py_exec_bytecode(self.code.bytecode, self.hide, store=self.store)
   File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/python.py", line 1178, in py_exec_bytecode
     exec(bytecode, globals, locals)
-  File "game/poker_minigame.rpy", line 20, in <module>
-    $ action = renpy.call_screen("poker_table_screen", mode="betting")
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/exports.py", line 3413, in call_screen
-    rv = renpy.ui.interact(mouse="screen", type="screen", roll_forward=roll_forward)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/ui.py", line 301, in interact
-    rv = renpy.game.interface.interact(roll_forward=roll_forward, **kwargs)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/core.py", line 2165, in interact
-    repeat, rv = self.interact_core(preloads=preloads, trans_pause=trans_pause, pause=pause, pause_start=pause_start, pause_modal=pause_modal, **kwargs) # type: ignore
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/core.py", line 2687, in interact_core
-    root_widget.visit_all(lambda d : d.per_interact())
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/displayable.py", line 431, in visit_all
-    d.visit_all(callback, seen)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/displayable.py", line 431, in visit_all
-    d.visit_all(callback, seen)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/displayable.py", line 431, in visit_all
-    d.visit_all(callback, seen)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/screen.py", line 485, in visit_all
-    self.child.visit_all(callback, seen=None)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/displayable.py", line 431, in visit_all
-    d.visit_all(callback, seen)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/displayable.py", line 431, in visit_all
-    d.visit_all(callback, seen)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/displayable.py", line 431, in visit_all
-    d.visit_all(callback, seen)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/displayable.py", line 421, in visit_all
-    for d in self.visit():
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/text/text.py", line 1996, in visit
-    self.update()
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/text/text.py", line 1970, in update
-    tokens = self.tokenize(text)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/text/text.py", line 2450, in tokenize
-    tokens.extend(textsupport.tokenize(i))
-  File "textsupport.pyx", line 147, in renpy.text.textsupport.tokenize
-Exception: Empty text tag in 'LLM 상태: Engine core initialization failed. See root cause above. Failed core proc(s): {}'.
+  File "game/poker_minigame.rpy", line 7, in <module>
+    $ play_dialogue_event("match_intro")
+  File "game/poker_dialogue.rpy", line 166, in play_dialogue_event
+    renpy.say(speaker, safe_text)
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/exports.py", line 1493, in say
+    who(what, *args, **kwargs)
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/character.py", line 1379, in __call__
+    what = self.prefix_suffix("what", self.what_prefix, what, self.what_suffix)
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/character.py", line 1293, in prefix_suffix
+    return (sub(prefix) + sub(body) + sub(suffix))
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/character.py", line 1273, in sub
+    return renpy.substitutions.substitute(s, scope=scope, force=force, translate=translate)[0]
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/substitutions.py", line 368, in substitute
+    s = interpolate(s, kwargs) # type: ignore
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/substitutions.py", line 97, in interpolate
+    rv += format(value, fmt)
+ValueError: Invalid format specifier
 
 Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39 x86_64
 Ren'Py 8.2.1.24030407
 LLMoker 1.0
-Thu Mar 19 02:02:54 2026
+Sat Mar 21 02:46:21 2026

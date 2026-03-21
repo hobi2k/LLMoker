@@ -12,13 +12,14 @@ init python:
     from backend.config import load_backend_config
 
     def ensure_backend_config():
-        """ensure_backend_config, Ren'Py 스토어에 백엔드 설정을 준비한다.
+        """
+        Ren'Py 스토어에 백엔드 설정 객체를 올리고 재사용한다.
 
         Args:
             없음.
 
         Returns:
-            BackendConfig: 현재 프로젝트에 연결된 백엔드 설정 객체.
+            현재 게임 세션에서 공유하는 백엔드 설정 객체다.
         """
 
         if store.poker_backend_config is None:

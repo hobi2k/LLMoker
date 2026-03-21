@@ -1,10 +1,11 @@
-"""sqlite_compat, 프로젝트에서 사용할 SQLite 드라이버를 고정 로드한다.
+"""
+프로젝트가 사용할 SQLite 드라이버를 한 곳에서 선택한다.
 
 Args:
     없음.
 
 Returns:
-    module: sqlite3 호환 인터페이스를 제공하는 모듈.
+    없음. 모듈 로드 시점에 사용할 SQLite 구현만 결정한다.
 """
 
 try:

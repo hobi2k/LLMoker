@@ -2,81 +2,78 @@
 
 ## 1. 목적
 
-이 문서는 현재 기본 모델 `LLMoker/llmoker/models/llm/saya_rp_4b_v3`를 기준으로 LLM NPC를 어떻게 연결하는지 정리한다.
+이 문서는 현재 기본 모델 `llmoker/models/llm/qwen3-4b-thinking`를 기준으로, LLM NPC가 어떤 파일 구조와 런타임 경계를 통해 동작하는지 정리한다.
 
-## 2. 현재 연결 방식
+## 2. 현재 구조
 
-현재 구조는 아래와 같다.
+현재 LLM 레이어는 아래처럼 분리한다.
 
-1. Ren'Py 게임은 `backend/poker_engine.py`에서 현재 상대 AI 모드를 확인한다.
-2. 상대 AI 모드가 `llm_npc`이면 `backend/llm_agent.py`를 사용한다.
-3. `LocalLLMAgent`는 `scripts/llm_runtime_worker.py`를 `llmoker/.venv/bin/python` 서브프로세스로 실행한다.
-4. 워커가 모델을 한 번 로드한 뒤 JSON 라인 방식으로 행동 요청을 처리한다.
-5. 실패하면 합법 행동 중 안전한 폴백으로 떨어진다.
+1. `backend/poker_engine.py`
+   포커 규칙과 공개/비공개 정보 경계를 관리한다.
+2. `backend/llm/agent.py`
+   포커 상태를 받아 행동, 카드 교체, 대사 생성, 정책 피드백 생성을 요청한다.
+3. `backend/llm/prompts.py`
+   공개 상태 문자열과 Qwen-Agent tool-calling 프롬프트를 조합한다.
+4. `backend/llm/worker_client.py`
+   `backend/llm/runtime_worker.py` 서브프로세스를 관리한다.
+5. `backend/llm/runtime_worker.py`
+   Qwen-Agent 요청을 별도 프로세스로 보내고 응답을 정리한다.
+6. `backend/llm/tools.py`
+   Qwen-Agent가 호출하는 포커 전용 도구를 정의한다.
+7. `backend/poker_hands.py`
+   카드 포맷팅, 덱 생성, 족보 비교를 담당한다.
+8. `backend/script_bot.py`
+   규칙 기반 스크립트봇 행동과 드로우 판단을 담당한다.
 
-현재 추론 백엔드는 둘 중 하나를 선택할 수 있다.
+새 코드는 `backend/llm/` 아래를 직접 기준으로 본다.
 
-- `vllm` + `bitsandbytes` 4비트
-- `transformers` 기본 로드
+`Qwen-Agent` 레이어를 왜 이렇게 나눴는지, 각 파일이 어떤 책임을 가지는지는 [qwen_agent.md](docs/qwen_agent.md)에 따로 정리한다.
 
-중요한 전제는 아래와 같다.
+## 3. 현재 모델과 백엔드
 
-- `vllm + bitsandbytes` 4비트는 CUDA GPU가 실제로 보이는 환경에서만 사용한다.
-- `torch.cuda.is_available()`가 `False`면 `vllm` 4비트는 기동하지 않고, 이 경우 `transformers` 백엔드로 내려야 한다.
-- 현재 구현은 `vllm` 기동 실패 시 자동으로 `transformers`로 전환하지 않는다.
-- 대신 상태 문구에 실패 원인을 그대로 남기고, 같은 설정으로는 매 턴 다시 기동을 반복하지 않는다.
-- 다른 백엔드를 쓰려면 메인 메뉴 `환경 설정`에서 사용자가 직접 `Transformers 사용`으로 바꿔야 한다.
+- 기본 모델 경로: `llmoker/models/llm/qwen3-4b-thinking`
+- 공식 다운로드 경로: `https://huggingface.co/Qwen/Qwen3-4B-Thinking-2507`
+- 기본 디바이스 힌트: `auto`
+- 기본 상대 AI: `LLM NPC`
+- 현재 LLM NPC 경로:
+  - `Qwen-Agent Assistant`
+  - `local transformers runtime`
 
-프롬프트 구성은 두 갈래로 분리한다.
+중요한 전제:
 
-- `build_action_prompt(...)`
-- `build_dialogue_prompt(...)`
+- `qwen_agent`는 로컬 `transformers` 백엔드와 함께 사용한다.
+- 워커는 모델을 직접 로드하고, 별도 모델 서버를 띄우지 않는다.
+- 기본 디바이스는 `auto`다. CUDA가 보이면 GPU를 쓰고, 아니면 CPU로 내린다.
+- 모델 로딩 실패 시 스크립트봇이나 다른 백엔드로 자동 폴백하지 않는다.
+- 실패 원인은 게임 상태 문구와 터미널 디버그 로그에 그대로 남긴다.
 
-### 2.1 현재 실제 연결 여부
+## 4. Qwen3 대응 원칙
 
-여기도 헷갈리지 않게 분리해서 적는다.
+Qwen3-4B-Thinking-2507 모델 카드와 Qwen-Agent 공식 문서 기준으로 현재 워커는 아래 원칙을 따른다.
 
-현재 실제로 연결된 것:
+- 기본 경로는 `Qwen-Agent + local transformers` 조합이다.
+- Qwen-Agent 쪽 에이전트 타입은 `Assistant`를 사용한다.
+- 로컬 모델 폴더 안 파일은 수정하지 않는다.
+- 현재는 로컬 `transformers` 로더에도 원본 모델 폴더를 그대로 전달한다.
+- Qwen 기본 chat template가 `<think>` 구간을 만들 수 있으므로, 행동 JSON 파싱과 대사 추출은 `</think>` 뒤 최종 응답만 사용한다.
+- `Qwen-Agent`의 `generate_cfg`는 로컬 `transformers`에서 바로 먹는 샘플링 인자만 전달한다.
 
-- `build_action_prompt(...)`
-- `build_draw_prompt(...)`
-- `build_dialogue_prompt(...)`
-- `LocalLLMAgent.choose_action(...)`
-- `LocalLLMAgent.choose_discards(...)`
-- `LocalLLMAgent.generate_dialogue(...)`
-- `llm_runtime_worker.py`
-- `PokerMatch._run_bot_turns()`
-- `PokerMatch.resolve_draw_phase()`
-- `play_dialogue_event(...)`
+Qwen-Agent를 사용할 때는 아래 입력을 함께 쓴다.
 
-즉, 행동 선택, 카드 교체 판단, 대사 생성 경로가 모두 연결되어 있다.
-다만 실제 추론 품질은 로컬 모델과 의존성 설치 상태에 따라 달라진다.
+- `llm_model_name`
+- `local_llm_path`
+- `llm_device`
 
-현재 개발용 스크립트 역할도 분리해서 본다.
+현재 기본 모델 이름은 `Qwen3-4B-Thinking-2507`로 맞춘다.
 
-- `scripts/llm_runtime_worker.py`
-  - 실제 게임에서 사용되는 LLM 런타임 워커다.
-- `scripts/run_match.py`
-  - Ren'Py 없이 포커 엔진만 자동 대전으로 검증하는 CLI 테스트 스크립트다.
+현재 연결된 도구는 아래 네 가지다.
 
-현재 대사 프롬프트는 단순 설명문 생성이 아니라 아래 원칙을 따른다.
+- `get_public_state`
+- `get_memory`
+- `get_recent_log`
+- `get_round_summary`
 
-- NPC가 플레이어에게 직접 말을 건다.
-- 최근 공개 행동이나 방금 나온 결과에 바로 반응한다.
-- 2인칭 심리전 대사 톤을 유지한다.
-- 공개되지 않은 플레이어 손패를 안다고 말하지 않는다.
-
-## 3. 현재 모델 경로
-
-- 기본 모델 경로: `llmoker/models/llm/saya_rp_4b_v3`
-
-현재 `config.py`는 이 폴더가 있으면 기본 LLM 경로로 우선 사용한다.
-다른 모델로 바꾸려면 아래 둘 중 하나를 사용한다.
-
-- `backend/config.py`의 `default_model_path` 수정
-- `LOCAL_LLM_PATH` 환경 변수 지정
-
-## 4. 정보 공개 규칙
+## 5. 정보 공개 규칙
 
 LLM NPC는 아래 정보만 볼 수 있다.
 
@@ -84,151 +81,99 @@ LLM NPC는 아래 정보만 볼 수 있다.
 - 현재 팟
 - 양측 스택
 - 현재 콜 금액
-- 합법 행동 목록
+- 현재 합법 행동
 - 공개 진행 로그
   - 체크
   - 베팅
   - 콜
   - 레이즈
   - 폴드
-  - 카드 교체 여부 및 교체 장수
+  - 카드 교체 여부와 교체 장수
 
 LLM NPC가 보면 안 되는 정보:
 
-- 플레이어의 현재 손패
-- 드로우 후 플레이어의 실제 카드 구성
+- 플레이어 현재 손패
+- 플레이어 드로우 후 실제 카드 구성
 
-이를 위해 엔진은 `action_log`와 별도로 `public_log`를 유지한다.
+이를 위해 엔진은 아래 두 로그를 분리한다.
 
 - `action_log`
-  - 플레이어 개인 손패 같은 비공개 정보가 들어갈 수 있다.
+  - 디버그와 전체 진행 추적용 로그
 - `public_log`
-  - 양측에 공개되어야 하는 정보만 들어간다.
+  - LLM 프롬프트에 들어가도 되는 공개 정보만 담는 로그
 
-LLM 프롬프트는 이 `public_log`만 참고한다.
+프롬프트는 항상 `public_log` 기준으로 조합한다.
 
-## 5. 왜 서브프로세스 워커를 쓰는가
+## 6. 실패 정책
 
-Ren'Py 번들 Python과 실제 로컬 추론 환경은 분리하는 편이 안전하다.
+현재 `LLM NPC` 모드에서는 아래를 숨기지 않는다.
 
-이 구조를 쓰는 이유:
+- 행동 선택 실패
+- 카드 교체 판단 실패
+- 대사 생성 실패
+- 정책 피드백 생성 실패
 
-- Ren'Py 런타임에 `torch`, `transformers`가 없을 수 있다.
-- 게임 UI 프로세스와 모델 추론 프로세스를 분리할 수 있다.
-- 모델은 워커에서 한 번만 로드하고 재사용할 수 있다.
+즉, 스크립트봇이나 안전 행동으로 조용히 대체하지 않는다. 문제가 있으면 바로 고치기 쉽게 오류를 그대로 드러내는 쪽을 택한다.
 
-## 6. 전략 수정 방식
+## 7. 대사 생성 구조
 
-LLM NPC는 결과에 따라 전략을 수정할 수 있어야 한다.
+대사 생성 흐름은 아래와 같다.
 
-현재 구조는 숫자 파라미터를 직접 학습하는 방식이 아니라, 텍스트 기반 피드백을 다음 판단에 다시 넣는 방식이다.
+1. `game/poker_dialogue.rpy`가 이벤트 발생 지점을 잡는다.
+2. `backend/llm/agent.py`가 공개 상태와 최근 공개 로그를 모은다.
+3. `backend/llm/prompts.py`가 대사 프롬프트를 조합한다.
+4. `backend/llm/runtime_worker.py`가 Qwen-Agent와 도구를 연결한다.
+5. Qwen-Agent는 필요할 때 `get_public_state`, `get_recent_log`, `get_memory`를 호출한다.
+6. 워커는 `</think>` 뒤 최종 대사만 추출해 반환한다.
 
-- 라운드 종료
-- `policy_loop.py`가 전략 피드백 생성
-- `memory_manager.py`에 단기/장기 기억 저장
-- 다음 행동 프롬프트와 카드 교체 프롬프트에 다시 반영
+## 7.1 정책 피드백 생성 구조
 
-즉, 현재 프로젝트의 강화학습 해석은:
+정책 피드백 흐름은 아래와 같다.
 
-`결과 -> 피드백 -> 기억 저장 -> 다음 판단 프롬프트에 반영`
+1. `backend/poker_engine.py`가 라운드 종료 시 `round_summary`와 `public_log`를 만든다.
+2. `backend/policy_loop.py`가 이를 받아 LLM 정책 리뷰를 요청한다.
+3. `backend/llm/prompts.py`가 정책 피드백 프롬프트를 조합한다.
+4. `backend/llm/agent.py`가 워커에 `policy` 모드 요청을 보낸다.
+5. `backend/llm/runtime_worker.py`가 `get_round_summary`, `get_recent_log`, `get_memory` 도구를 연결한다.
+6. 워커가 `short_term`, `long_term`, `strategy_focus` JSON을 반환한다.
+7. `backend/memory_manager.py`가 단기/장기 기억으로 저장한다.
 
-형태의 in-context reinforcement learning이다.
+즉, `policy_loop`는 더 이상 단순 규칙 문자열 생성기가 아니라, LLM 정책 회고를 메모리 형식으로 적재하는 경계 레이어다.
 
-중요한 점은 이 업데이트가 파라미터 학습이 아니라 `행동 정책의 문맥 내 수정`이라는 점이다.
-자세한 기준은 [icrl_policy_update.md](/home/hosung/pytorch-demo/LLMoker/docs/icrl_policy_update.md)를 따른다.
-
-## 7. 현재 필요한 Python 의존성
+## 8. 현재 의존성
 
 LLM NPC를 실제 추론까지 쓰려면 `.venv` 환경에 아래 패키지가 필요하다.
 
 - `torch`
+- `qwen-agent`
 - `transformers`
-- `accelerate`
-- `vllm`
-- `bitsandbytes`
 
-현재 권장 설치 기준은 아래와 같다.
+모델이 비어 있거나 일부 파일만 남아 있으면 `./5Drawminigame.sh`가 먼저 자동 다운로드를 시도한다.
+자동 다운로드가 실패하면 아래 경로를 안내하고, 사용자가 직접 모델을 내려받아 배치하도록 한다.
+
+- 다운로드: `https://huggingface.co/Qwen/Qwen3-4B-Thinking-2507`
+- 배치 위치: `llmoker/models/llm/qwen3-4b-thinking`
+- 자동 다운로드를 끄고 직접 관리하려면 `LLMOKER_SKIP_MODEL_DOWNLOAD=1 ./5Drawminigame.sh`로 실행한다.
+
+현재 권장 설치 예시는 아래와 같다.
 
 ```bash
-/home/hosung/pytorch-demo/LLMoker/llmoker/.venv/bin/python -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu130
-/home/hosung/pytorch-demo/LLMoker/llmoker/.venv/bin/python -m pip install transformers==4.57.3 accelerate protobuf
-/home/hosung/pytorch-demo/LLMoker/llmoker/.venv/bin/python -m pip install vllm bitsandbytes
+llmoker/.venv/bin/python -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu130
+llmoker/.venv/bin/python -m pip install protobuf qwen-agent transformers
 ```
 
-현재 `saya_rp_4b_v3` 기준으로 실제 확인된 핵심 버전은 아래와 같다.
+## 9. 주요 파일
 
-- `torch 2.10.0+cu130`
-- `torchvision 0.25.0+cu130`
-- `torchaudio 2.10.0+cu130`
-- `transformers 4.57.3`
-- `accelerate 1.13.0`
-- `protobuf 6.33.5`
+- [agent.py](llmoker/backend/llm/agent.py)
+- [prompts.py](llmoker/backend/llm/prompts.py)
+- [worker_client.py](llmoker/backend/llm/worker_client.py)
+- [tools.py](llmoker/backend/llm/tools.py)
+- [runtime_worker.py](llmoker/backend/llm/runtime_worker.py)
+- [poker_engine.py](llmoker/backend/poker_engine.py)
 
-즉:
+## 10. 관련 문서
 
-- UI 전환은 구현됨
-- 모델 경로 연결도 구현됨
-- 워커 구조도 구현됨
-- 실제 추론은 `llmoker/.venv` 기준 의존성 설치 후 활성화됨
-- `transformers` 경로는 위 버전 조합에서 `ready`까지 올라가는 것을 확인했다
-- `vllm + bitsandbytes` 4비트는 CUDA GPU가 보이는 환경에서만 `ready`까지 올라간다
-
-## 8. 상대 AI 설정 위치
-
-상대 AI 변경은 메인 메뉴의 `환경 설정` 화면에서 한다.
-
-기본값:
-
-- `LLM NPC`
-
-- `LLM NPC 사용`
-- `스크립트봇 사용`
-
-게임 도중 오버레이에서는 아래 정보만 확인한다.
-
-- 현재 상대 AI 모드
-- 현재 모델 경로
-- 현재 LLM 상태
-- 현재 영상 배경과 라운드 연출은 포커 UI 스크린이 자동으로 처리한다.
-
-메인 메뉴 `환경 설정` 화면에서는 아래 항목을 함께 다룬다.
-
-- 현재 상대 AI 모드
-- 현재 LLM 추론 백엔드
-- 화면 모드
-- 건너뛰기 설정
-- 텍스트 속도와 자동 진행
-- 오디오 볼륨
-
-LLM 행동 선택 로그와 대사 생성 로그는 게임 진행 로그에도 `[LLM NPC] ...` 형식으로 남는다.
-
-추가로, 게임 화면에서는 비공개인 정보라도 터미널 디버그 로그에는 아래 항목을 출력한다.
-
-- 라운드 시작 시 LLM NPC 시작 손패와 족보
-- 베팅 단계에서 LLM NPC 손패, 허용 행동, 선택 행동, 이유
-- 드로우 단계에서 카드 교체 전 손패, 버릴 인덱스, 교체 후 손패
-- 쇼다운 또는 폴드 종료 시 양측 결과와 LLM NPC 손패
-- 대사 이벤트별 LLM 대사 생성 결과
-
-이 터미널 로그는 `[LLMoker][DEBUG] ...` 형식으로만 출력되며, 게임 UI에는 그대로 노출하지 않는다.
-
-## 9. 관련 파일
-
-- [config.py](/home/hosung/pytorch-demo/LLMoker/llmoker/backend/config.py)
-- [llm_agent.py](/home/hosung/pytorch-demo/LLMoker/llmoker/backend/llm_agent.py)
-- [prompt_builder.py](/home/hosung/pytorch-demo/LLMoker/llmoker/backend/prompt_builder.py)
-- [poker_engine.py](/home/hosung/pytorch-demo/LLMoker/llmoker/backend/poker_engine.py)
-- [llm_runtime_worker.py](/home/hosung/pytorch-demo/LLMoker/llmoker/scripts/llm_runtime_worker.py)
-- [poker_ui.rpy](/home/hosung/pytorch-demo/LLMoker/llmoker/game/poker_ui.rpy)
-
-## 10. 다음 단계
-
-실제 LLM NPC 품질을 올리려면 다음 순서가 맞다.
-
-1. WSL 또는 로컬 런타임에서 `torch.cuda.is_available()`가 `True`인지 먼저 확인
-2. `llmoker/.venv`에 `vllm`, `bitsandbytes` 설치
-3. 메인 메뉴 `환경 설정`에서 `vLLM 4비트 사용`을 선택
-4. GPU가 안 보이면 `Transformers 사용`으로 내려서 계속 플레이
-5. 대사 생성 품질을 위한 길이 제한과 화자 톤 규칙을 더 조정
-6. memory와 recent feedback를 프롬프트에 더 정교하게 반영
-7. LLM 실패 시 현재처럼 안전 폴백 유지
+- [블루프린트](docs/blueprint.md)
+- [대사 시스템](docs/dialogue_system.md)
+- [ICRL 정책 업데이트](docs/icrl_policy_update.md)
+- [Ren'Py 런타임 구조](docs/renpy_engine.md)

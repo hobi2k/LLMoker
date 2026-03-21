@@ -10,7 +10,7 @@
 - 왜 시스템 Python이나 일반 `venv`에만 의존하면 안 되는가
 - `renpy/`, `lib/`, `game/`는 각각 무슨 역할을 하는가
 - `.venv`와 `vendor/`를 무엇에 나눠 써야 하는가
-- `scripts/llm_runtime_worker.py`와 `scripts/run_match.py`는 각각 어디서 쓰는가
+- `backend/llm/runtime_worker.py`와 `scripts/run_match.py`는 각각 어디서 쓰는가
 
 ## 2. 핵심 결론
 
@@ -138,17 +138,17 @@ llmoker/
   - `backend/save_state_store.py`
   - 세이브, 기억, 리플레이 관리
 - `.venv`
-  - `scripts/llm_runtime_worker.py`
+  - `backend/llm/runtime_worker.py`
   - `torch`
+  - `qwen-agent`
   - `transformers`
-  - `accelerate`
-  - 로컬 모델 추론
+  - Qwen-Agent와 로컬 모델 추론 처리
 
 즉, SQLite는 현재 LLM 워커가 아니라 Ren'Py 본체가 직접 사용한다.
 
 그래서:
 
-- `torch`, `transformers`는 `.venv` 설치가 맞다.
+- `torch`, `qwen-agent`, `transformers`는 `.venv` 설치가 맞다.
 - `sqlite3` 대체 드라이버는 Ren'Py 본체가 읽을 수 있어야 하므로 `vendor/`가 맞다.
 
 `.venv`에 `pysqlite3`를 설치해도 Ren'Py 본체는 그 환경을 자동으로 보지 않는다.
@@ -180,7 +180,7 @@ llmoker/
 - RAG
 - 벡터 유사도 검색
 
-이 로직이 `llm_runtime_worker.py`나 별도 백엔드 서비스에서만 돈다면 `sqlite-vec`는 `.venv`에 설치하는 편이 맞다.
+이 로직이 `backend/llm/runtime_worker.py`나 별도 백엔드 서비스에서만 돈다면 `sqlite-vec`는 `.venv`에 설치하는 편이 맞다.
 
 현재 `LLMoker`는 두 번째 방향이 더 자연스럽다.
 
@@ -222,11 +222,11 @@ llmoker/
 
 ## 8. 현재 스크립트 파일의 역할
 
-현재 `llmoker/scripts/` 아래에서 자주 헷갈리는 두 파일은 역할이 다르다.
+현재 자주 헷갈리는 런타임 워커와 개발 스크립트는 역할이 다르다.
 
-- `scripts/llm_runtime_worker.py`
+- `backend/llm/runtime_worker.py`
   - 실제 게임에서 사용한다.
-  - `backend/llm_agent.py`가 서브프로세스로 실행한다.
+  - `backend/llm/worker_client.py`가 서브프로세스로 실행한다.
   - 행동 선택, 카드 교체, 대사 생성 요청을 JSON 라인 기반으로 처리한다.
 - `scripts/run_match.py`
   - 실제 Ren'Py 게임 런타임에서는 사용하지 않는다.

@@ -46,6 +46,11 @@ if [ -z "$RENPY_PLATFORM" ] ; then
 fi
 
 LIB="$ROOT/lib/$PYTHON-$RENPY_PLATFORM"
+RUNNER_PYTHON="$ROOT/.venv/bin/python"
+
+if ! test -x "$RUNNER_PYTHON"; then
+    RUNNER_PYTHON="python3"
+fi
 
 if ! test -d "$LIB"; then
     echo "Ren'Py platform files not found in:"
@@ -56,6 +61,15 @@ if ! test -d "$LIB"; then
     echo "or point them to an existing installation using ./after_checkout.sh <path>."
     echo
     echo "Alternatively, please set RENPY_PLATFORM to a different platform."
+    exit 1
+fi
+
+if ! "$RUNNER_PYTHON" -m backend.llm.model_bootstrap; then
+    echo
+    echo "LLM 모델 다운로드에 실패했습니다."
+    echo "공식 모델: https://huggingface.co/Qwen/Qwen3-4B-Thinking-2507"
+    echo "배치 위치: $ROOT/models/llm/qwen3-4b-thinking"
+    echo "자동 다운로드를 건너뛰려면 LLMOKER_SKIP_MODEL_DOWNLOAD=1 로 실행하세요."
     exit 1
 fi
 

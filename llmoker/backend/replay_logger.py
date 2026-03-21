@@ -6,13 +6,14 @@ from backend.sqlite_compat import sqlite
 
 
 class ReplayLogger:
-    """ReplayLogger, 라운드 결과를 SQLite 리플레이 로그로 저장한다.
+    """
+    라운드 결과를 나중에 다시 분석할 수 있도록 SQLite에 남긴다.
 
     Args:
-        db_path: 리플레이 SQLite 파일 경로.
+        db_path: 리플레이 데이터베이스 파일 경로다.
 
     Returns:
-        ReplayLogger: 리플레이 기록 객체.
+        없음. 인스턴스를 초기화하고 저장소를 준비한다.
     """
 
     def __init__(self, db_path):
@@ -21,25 +22,27 @@ class ReplayLogger:
         self._initialize_db()
 
     def _connect(self):
-        """_connect, SQLite 연결을 생성한다.
+        """
+        현재 리플레이 데이터베이스에 대한 SQLite 연결을 연다.
 
         Args:
             없음.
 
         Returns:
-            sqlite.Connection: SQLite 연결 객체.
+            `sqlite3.Connection` 객체다.
         """
 
         return sqlite.connect(self.db_path)
 
     def _initialize_db(self):
-        """_initialize_db, 리플레이 테이블을 초기화한다.
+        """
+        리플레이 저장에 필요한 테이블이 없으면 만든다.
 
         Args:
             없음.
 
         Returns:
-            None: 테이블을 생성한다.
+            없음. 데이터베이스 스키마만 보장한다.
         """
 
         with self._connect() as connection:
@@ -57,13 +60,14 @@ class ReplayLogger:
             )
 
     def append_round(self, summary):
-        """append_round, 라운드 요약 정보를 리플레이 파일에 기록한다.
+        """
+        한 라운드가 끝난 뒤 핵심 요약 정보를 리플레이 로그에 추가한다.
 
         Args:
-            summary: 라운드 종료 요약 사전.
+            summary: 우승자, 팟, 로그 등을 담은 라운드 요약 사전이다.
 
         Returns:
-            None: 요약 정보를 SQLite 테이블에 추가한다.
+            없음. 요약 한 건을 데이터베이스에 저장한다.
         """
 
         payload = dict(summary)

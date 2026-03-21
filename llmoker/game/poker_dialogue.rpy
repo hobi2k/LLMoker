@@ -3,15 +3,37 @@ default poker_round_summary_text = ""
 default poker_match_intro_seen = False
 
 init python:
-    def update_status_from_messages(messages, fallback=None):
-        """update_status_from_messages, 최근 처리 결과를 상태 문구로 반영한다.
+    def _escape_renpy_say_text(text):
+        """
+        Ren'Py say에서 해석되는 치환 문자들을 일반 문자열로 바꾼다.
 
         Args:
-            messages: 이번 처리에서 생성된 로그 문자열 목록.
-            fallback: 메시지가 없을 때 사용할 기본 상태 문구.
+            text: 대사창에 넣을 원문 문자열이다.
 
         Returns:
-            None: 화면 상태 문구를 store에 갱신한다.
+            Ren'Py 치환 문자가 이스케이프된 문자열이다.
+        """
+
+        if text is None:
+            return ""
+
+        escaped = str(text)
+        escaped = escaped.replace("%", "%%")
+        escaped = escaped.replace("[", "[[")
+        escaped = escaped.replace("{", "{{")
+        escaped = escaped.replace("}", "}}")
+        return escaped
+
+    def update_status_from_messages(messages, fallback=None):
+        """
+        최근 처리 결과를 상태 문구로 반영한다.
+
+        Args:
+            messages: 최근 처리 결과 로그 목록이다.
+            fallback: 로그가 비었을 때 대신 넣을 문자열이다.
+
+        Returns:
+            없음.
         """
 
         if messages:
@@ -20,14 +42,15 @@ init python:
             store.poker_status_text = fallback
 
     def _dialogue_event_lines(event_name, messages=None):
-        """_dialogue_event_lines, 현재 상황에 맞는 스크립트 대사 목록을 생성한다.
+        """
+        현재 상황에 맞는 스크립트 대사 목록을 생성한다.
 
         Args:
-            event_name: 대사 이벤트 식별자.
-            messages: 직전 행동 로그 문자열 목록.
+            event_name: 대사 이벤트 이름이다.
+            messages: 직전 처리 결과 로그 목록이다.
 
         Returns:
-            list: `(화자 키, 대사 문자열)` 튜플 목록.
+            `(speaker_key, text)` 튜플 목록이다.
         """
 
         match = get_poker_match()
@@ -99,13 +122,14 @@ init python:
         return lines
 
     def _round_result_summary_text(match):
-        """_round_result_summary_text, 라운드 결과를 대사 프롬프트용 요약으로 변환한다.
+        """
+        라운드 결과를 대사 프롬프트용 요약으로 변환한다.
 
         Args:
-            match: 현재 포커 매치 객체.
+            match: 현재 포커 매치 객체다.
 
         Returns:
-            str | None: 라운드 결과 요약 문자열.
+            대사 프롬프트에 넣을 라운드 요약 문자열 또는 None이다.
         """
 
         if not match.round_summary:
@@ -120,14 +144,15 @@ init python:
         )
 
     def _llm_dialogue_lines(event_name, messages=None):
-        """_llm_dialogue_lines, LLM NPC가 생성한 대사를 화면용 튜플 목록으로 만든다.
+        """
+        LLM NPC가 생성한 대사를 화면용 튜플 목록으로 만든다.
 
         Args:
-            event_name: 대사 이벤트 식별자.
-            messages: 직전 행동 로그 문자열 목록.
+            event_name: 대사 이벤트 이름이다.
+            messages: 직전 처리 결과 로그 목록이다.
 
         Returns:
-            list: `(화자 키, 대사 문자열)` 튜플 목록.
+            `(speaker_key, text)` 튜플 목록이다.
         """
 
         match = get_poker_match()
@@ -136,6 +161,14 @@ init python:
 
         result_summary = _round_result_summary_text(match)
         generation = match.llm_agent.generate_dialogue(match, event_name, result_summary=result_summary)
+        if generation.get("status") != "ok":
+            reason = generation.get("reason", "LLM 대사 생성 실패")
+            match._debug_terminal_log("%s 대사 생성 실패 / 이벤트: %s / 이유: %s" % (
+                match.bot.name,
+                event_name,
+                reason,
+            ))
+            return [("sys", "LLM NPC 대사 생성 실패: %s" % reason)]
         dialogue_text = generation.get("text", "").strip()
         if not dialogue_text:
             return []
@@ -156,23 +189,25 @@ init python:
         return lines
 
     def play_dialogue_event(event_name, messages=None):
-        """play_dialogue_event, 이벤트에 맞는 대사를 출력하고 실패 시 스크립트 대사로 폴백한다.
+        """
+        이벤트에 맞는 대사를 출력한다.
 
         Args:
-            event_name: 대사 이벤트 식별자.
-            messages: 직전 행동 로그 문자열 목록.
+            event_name: 대사 이벤트 이름이다.
+            messages: 직전 처리 결과 로그 목록이다.
 
         Returns:
-            None: Ren'Py 대사 창에 대사를 출력한다.
+            없음.
         """
 
         lines = _llm_dialogue_lines(event_name, messages)
-        if not lines:
+        if not lines and get_poker_match().bot_mode != "llm_npc":
             lines = _dialogue_event_lines(event_name, messages)
-        if event_name in ("round_end", "match_end"):
-            renpy.show("poker_bunny_result")
-        else:
-            renpy.show("poker_bunny")
+
+        renpy.show_screen(
+            "poker_dialogue_backdrop",
+            video_name=get_poker_dialogue_background_name(event_name),
+        )
 
         speaker_map = {
             "sb": store.sb,
@@ -182,7 +217,10 @@ init python:
 
         for speaker_key, text in lines:
             speaker = speaker_map.get(speaker_key)
+            safe_text = _escape_renpy_say_text(text)
             if speaker is None:
-                renpy.say(None, text)
+                renpy.say(None, safe_text)
             else:
-                renpy.say(speaker, text)
+                renpy.say(speaker, safe_text)
+
+        renpy.hide_screen("poker_dialogue_backdrop")

@@ -43,9 +43,11 @@
 1. 라운드가 끝난다.
 2. `policy_loop.py`가 결과를 읽는다.
 3. 승패, 폴드 여부, 족보 비교를 바탕으로 피드백 문장을 만든다.
-4. `memory_manager.py`가 이를 SQLite 메모리에 저장한다.
-5. 다음 라운드에서 `prompt_builder.py`가 최근 피드백과 장기 기억을 다시 프롬프트에 넣는다.
-6. `llm_agent.py`가 이 문맥을 사용해 다음 행동 정책을 고른다.
+4. 현재 `LLM NPC` 모드에서는 `policy_loop.py`가 이 결과와 공개 로그를 다시 LLM에 보내 정책 회고를 만든다.
+5. 이 요청은 `Qwen-Agent` tool calling 형식으로 `get_round_summary`, `get_recent_log`, `get_memory`를 조회하면서 수행한다.
+6. `memory_manager.py`가 이를 SQLite 메모리에 저장한다.
+7. 다음 라운드에서 `backend/llm/agent.py`가 같은 도구 경로로 최근 피드백과 장기 기억을 다시 조회하게 한다.
+8. 그 문맥을 바탕으로 다음 행동 정책을 고른다.
 
 즉, 학습의 대상은 모델 가중치가 아니라 `현재 추론 문맥 안의 정책`이다.
 
@@ -93,6 +95,9 @@ ICRL도 반드시 `public_log` 기준으로만 적용한다.
   - 콜
   - 레이즈
   - 폴드
+- 정책 회고
+  - 직전 라운드에서 무엇이 먹혔는지
+  - 다음 라운드에서 무엇을 우선 볼지
 - 드로우 정책
   - 어떤 카드를 몇 장 교체할지
 - 대사 정책
@@ -109,6 +114,7 @@ ICRL도 반드시 `public_log` 기준으로만 적용한다.
 현재 실제 연결 상태는 아래와 같다.
 
 - 행동 선택 ICRL 경로: 연결됨
+- 정책 피드백 ICRL 경로: 연결됨
 - 카드 교체 ICRL 경로: 연결됨
 - 대사 생성 ICRL 경로: 연결됨
 - 모델 파라미터 학습: 없음
@@ -123,9 +129,10 @@ ICRL도 반드시 `public_log` 기준으로만 적용한다.
 
 ## 8. 구현 파일
 
-- [policy_loop.py](/home/hosung/pytorch-demo/LLMoker/llmoker/backend/policy_loop.py)
-- [memory_manager.py](/home/hosung/pytorch-demo/LLMoker/llmoker/backend/memory_manager.py)
-- [prompt_builder.py](/home/hosung/pytorch-demo/LLMoker/llmoker/backend/prompt_builder.py)
-- [llm_agent.py](/home/hosung/pytorch-demo/LLMoker/llmoker/backend/llm_agent.py)
-- [poker_engine.py](/home/hosung/pytorch-demo/LLMoker/llmoker/backend/poker_engine.py)
-- [poker_dialogue.rpy](/home/hosung/pytorch-demo/LLMoker/llmoker/game/poker_dialogue.rpy)
+- [policy_loop.py](llmoker/backend/policy_loop.py)
+- [memory_manager.py](llmoker/backend/memory_manager.py)
+- [prompts.py](llmoker/backend/llm/prompts.py)
+- [agent.py](llmoker/backend/llm/agent.py)
+- [tools.py](llmoker/backend/llm/tools.py)
+- [poker_engine.py](llmoker/backend/poker_engine.py)
+- [poker_dialogue.rpy](llmoker/game/poker_dialogue.rpy)

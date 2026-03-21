@@ -2,10 +2,12 @@
 
 ## 1. 프로젝트 개요
 
-Ren'Py 런타임 구조와 `vendor/` 사용 이유는 [renpy_engine.md](/home/hosung/pytorch-demo/LLMoker/docs/renpy_engine.md)에 별도로 정리한다.
-대사 이벤트 훅과 현재 LLM 대사 연결 구조는 [dialogue_system.md](/home/hosung/pytorch-demo/LLMoker/docs/dialogue_system.md)에 별도로 정리한다.
-현재 LLM NPC 연결 방식과 `saya_rp_4b_v3` 모델 사용 구조는 [llm_npc_setup.md](/home/hosung/pytorch-demo/LLMoker/docs/llm_npc_setup.md)에 별도로 정리한다.
-ICRL을 `파인튜닝`이 아니라 `문맥 내 행동 정책 업데이트`로 해석하는 기준은 [icrl_policy_update.md](/home/hosung/pytorch-demo/LLMoker/docs/icrl_policy_update.md)에 별도로 정리한다.
+Ren'Py 런타임 구조와 `vendor/` 사용 이유는 [renpy_engine.md](docs/renpy_engine.md)에 별도로 정리한다.
+대사 이벤트 훅과 현재 LLM 대사 연결 구조는 [dialogue_system.md](docs/dialogue_system.md)에 별도로 정리한다.
+현재 LLM NPC 연결 방식과 `qwen3-4b-thinking` 모델 사용 구조는 [llm_npc_setup.md](docs/llm_npc_setup.md)에 별도로 정리한다.
+`Qwen-Agent` 레이어의 파일 역할과 폴더 구조 이유는 [qwen_agent.md](docs/qwen_agent.md)에 별도로 정리한다.
+ICRL을 `파인튜닝`이 아니라 `문맥 내 행동 정책 업데이트`로 해석하는 기준은 [icrl_policy_update.md](docs/icrl_policy_update.md)에 별도로 정리한다.
+코드 작성 스타일과 독스트링 기준은 [styleguide.md](docs/styleguide.md)에 별도로 정리한다.
 LLM 의존성 관리는 루트 `requirements.txt`, 루트 `pyproject.toml`, `llmoker/pyproject.toml`에 같이 반영한다.
 
 LLMoker는 다음 요소를 결합하는 LLM 기반 게임 프로젝트다.
@@ -30,6 +32,7 @@ LLM NPC 설계의 핵심 제약은 아래와 같다.
 - LLM NPC와 플레이어가 공통으로 보는 정보는 공개 베팅/체크/레이즈/폴드/카드 교체 수 같은 공개 행동 정보뿐이다.
 - LLM NPC는 대화로 심리전을 걸 수 있다.
 - LLM NPC는 결과와 피드백을 바탕으로 in-context reinforcement learning 방식으로 행동 정책과 대사 정책을 수정할 수 있다.
+- 이때 라운드 회고와 다음 전략 초점도 LLM이 직접 생성해야 한다. 규칙 기반 회고는 `스크립트봇` 경로에만 남긴다.
 
 ## 1.1 현재 구현 요약
 
@@ -39,13 +42,22 @@ LLM NPC 설계의 핵심 제약은 아래와 같다.
 - 메인 메뉴 배경 `game/gui/main.webm` 적용
 - 포커 기본 배경 `game/images/minigames/normal.webm` 적용
 - 라운드 종료 시 승패별 `win.webm`, `lost.webm` 배경 전환
+- 위 `webm` 영상 자산은 `Wan 2.2` 기반 생성본을 사용
+- 현재 GUI 기준 해상도는 `1024x576`이며, 영상과 포커 UI를 같은 비율로 축소해 사용
 - 정통 5드로우에 가까운 `체크 / 베팅 / 콜 / 레이즈 / 폴드 / 드로우` 흐름
 - 스크립트봇과 LLM NPC 전환 지원
 - LLM 행동 선택, 카드 교체, 대사 생성 연결
-- 대사 이벤트 훅과 스크립트 폴백 유지
+- 라운드 종료 후 정책 피드백과 다음 전략 초점도 LLM이 생성
+- 위 네 흐름은 모두 `Qwen-Agent` tool calling으로 공개 상태와 기억을 조회하면서 처리
+- 대사 이벤트 훅은 유지하되, `LLM NPC` 모드 실패를 스크립트 대사로 숨기지 않는다.
 - memory / replay / save SQLite 저장
 - 터미널 디버그 로그로 NPC 비공개 손패와 행동 판단 확인 가능
-- `vLLM 4비트` 실패 시 자동 폴백 없이 명시적 실패 상태 유지
+- LLM NPC 경로는 `Qwen-Agent(local transformers)` 하나로 고정
+- Qwen-Agent 쪽 에이전트 타입은 `Assistant`로 유지
+- 메인 메뉴에서 고를 수 있는 상대 AI는 `LLM NPC`와 `스크립트봇` 두 가지뿐이다
+- LLM NPC 실패 시 자동 폴백 없이 명시적 실패 상태를 유지한다
+- `qwen3-4b-thinking`는 사고 구간과 최종 응답을 분리해 사용하고, 행동/드로우/대사 해석은 `</think>` 뒤 최종 응답만 기준으로 한다.
+- 로컬 모델 폴더 내부 파일은 수정하지 않는다.
 
 ## 2. 2026년 3월 19일 기준 폴더 구조
 
@@ -145,6 +157,21 @@ LLMoker/
     ├── lib/
     ├── vendor/
     ├── main.py
+    ├── backend/
+    │   ├── config.py
+    │   ├── poker_engine.py
+    │   ├── poker_hands.py
+    │   ├── script_bot.py
+    │   ├── memory_manager.py
+    │   ├── replay_logger.py
+    │   ├── save_state_store.py
+    │   └── llm/
+    │       ├── agent.py
+    │       ├── prompts.py
+    │       ├── results.py
+    │       ├── tools.py
+    │       ├── worker_client.py
+    │       └── runtime_worker.py
     └── pyproject.toml
 ```
 
@@ -159,7 +186,17 @@ LLMoker/
 - `vendor/`
   - Ren'Py 번들 파이썬에 기본 포함되지 않은 의존성을 넣는 폴더다. 현재는 SQLite 사용을 위해 `pysqlite3-binary`를 여기서 로드한다.
 - `models/llm/`
-  - 로컬 LLM 모델 폴더다. 현재 기본 대상 모델은 `saya_rp_4b_v3`다. 다른 모델로 바꾸려면 `backend/config.py`의 기본 경로 또는 `LOCAL_LLM_PATH`를 수정한다.
+  - 로컬 LLM 모델 폴더다. 현재 기본 대상 모델은 `qwen3-4b-thinking`다. 공식 소스는 `https://huggingface.co/Qwen/Qwen3-4B-Thinking-2507`이며, 다른 모델로 바꾸려면 `backend/config.py`의 기본 경로 또는 `LOCAL_LLM_PATH`를 수정한다.
+- `backend/poker_hands.py`
+  - 카드 표현, 덱 생성, 족보 평가처럼 포커 규칙 공용 로직을 분리한 파일이다.
+- `backend/script_bot.py`
+  - LLM이 꺼져 있어도 완전한 한 판을 진행할 수 있는 규칙 기반 상대를 둔 파일이다.
+- `backend/llm/`
+  - Qwen-Agent 레이어를 모아 둔 폴더다.
+  - 여기서 `agent.py`는 엔진 어댑터, `prompts.py`는 프롬프트, `tools.py`는 tool calling 노출면, `worker_client.py`는 서버와 워커 관리, `runtime_worker.py`는 실제 워커 실행 진입점을 맡는다.
+- `scripts/`
+  - 개발용 보조 스크립트만 둔다.
+  - 현재는 `run_match.py`처럼 CLI 테스트용 파일만 여기에 둔다.
 - `poker_minigame.rpy`
   - 실제 라벨 흐름과 화면 전환의 메인 진입점
 - `poker_core.rpy`
@@ -193,8 +230,10 @@ LLMoker/
 - Ren'Py는 연출과 화면을 담당한다.
 - 포커 규칙 엔진은 진실의 원천이 된다.
 - LLM은 행동 제안만 하고, 최종 판정 권한은 엔진이 가진다.
-- 대사 시스템은 라운드 이벤트 훅 기반으로 붙이고, LLM 대사 생성과 스크립트 폴백이 같은 훅을 재사용한다.
-- 상대 AI는 게임 옵션에서 `스크립트봇`과 `LLM NPC` 사이를 전환할 수 있어야 한다.
+- `Qwen-Agent + local transformers` 레이어는 Ren'Py 본체와 분리된 프로세스 경계로 유지한다.
+- 이 분리는 단순 취향이 아니라, Ren'Py 런타임과 로컬 모델 의존성을 직접 섞지 않기 위한 선택이다.
+- 대사 시스템은 라운드 이벤트 훅 기반으로 붙인다. `스크립트봇` 모드는 규칙 기반 대사를 쓰고, `LLM NPC` 모드는 실패를 그대로 노출한다.
+- 상대 AI는 메인 메뉴 `환경 설정`에서만 `스크립트봇`과 `LLM NPC` 사이를 전환할 수 있어야 한다.
 - 기본 상대 AI는 `LLM NPC`로 두고, 필요할 때만 `스크립트봇`으로 내릴 수 있게 한다.
 
 ## 4. 백엔드 및 모델 폴더 구조
@@ -214,11 +253,15 @@ LLMoker/
     ├── backend/
     │   ├── config.py
     │   ├── poker_engine.py
-    │   ├── llm_agent.py
     │   ├── memory_manager.py
-    │   ├── prompt_builder.py
     │   ├── policy_loop.py
-    │   └── replay_logger.py
+    │   ├── replay_logger.py
+    │   └── llm/
+    │       ├── agent.py
+    │       ├── prompts.py
+    │       ├── results.py
+    │       ├── tools.py
+    │       └── worker_client.py
     ├── models/
     │   └── llm/
     ├── data/
@@ -282,27 +325,39 @@ llmoker/models/llm/llama-3.1-8b-instruct/
 이 프로젝트는 원격 API가 아니라 로컬 모델 사용을 전제로 한다. 따라서 문서와 구현 모두 아래 기준으로 맞춘다.
 
 - 모델 가중치는 `llmoker/models/llm/` 아래에 둔다.
-- 추론 래퍼는 `backend/llm_agent.py`에서 담당한다.
-- 프롬프트 구성은 `backend/prompt_builder.py`에서 담당한다.
+- 추론 상위 로직은 `backend/llm/agent.py`에서 담당한다.
+- 프롬프트 구성은 `backend/llm/prompts.py`에서 담당한다.
+- Qwen-Agent 도구 정의는 `backend/llm/tools.py`에서 담당한다.
+- 워커 프로세스 관리는 `backend/llm/worker_client.py`에서 담당한다.
+- 워커 실행 진입점은 `backend/llm/runtime_worker.py`에서 담당한다.
 - 메모리와 피드백 반영은 `backend/memory_manager.py`, `backend/policy_loop.py`에서 담당한다.
+- `backend/policy_loop.py`는 LLM 정책 리뷰 결과를 SQLite 메모리에 적재하는 경계 레이어다.
 - LLM 워커 파이썬은 기본적으로 `llmoker/.venv/bin/python`을 사용한다.
-- 기본 LLM 추론 백엔드는 `vllm + bitsandbytes 4비트`다.
-- 호환성 이슈가 있을 때만 `transformers` 백엔드로 내린다.
-- `vllm + bitsandbytes 4비트`는 CUDA GPU가 실제로 보이는 환경에서만 사용한다.
-- `torch.cuda.is_available()`가 `False`면 사용자가 `transformers` 백엔드로 직접 전환하는 것을 기본 대응으로 본다.
-- 현재 구현은 `vllm` 기동 실패 시 자동 폴백하지 않고, 상태 문구에 실패 원인을 그대로 남긴다.
-- 같은 실패 설정으로는 매 턴 재기동을 반복하지 않으며, 백엔드 변경은 사용자가 메인 메뉴 `환경 설정`에서 직접 수행한다.
+- LLM NPC는 `Qwen-Agent + local transformers` 조합으로만 동작한다.
+- Qwen-Agent에는 로컬 `transformers`에서 바로 먹는 샘플링 설정만 전달한다.
+- 워커는 모델을 직접 로드하고, 별도 모델 서버를 자동 기동하지 않는다.
+- 디바이스 힌트는 `auto`를 기본으로 두고, CUDA가 보일 때만 GPU를 사용한다.
+- 행동, 드로우, 대사, 정책 회고는 모두 tool calling 형식으로 `get_public_state`, `get_memory`, `get_recent_log`, `get_round_summary`를 조회할 수 있어야 한다.
+- 게임 UI에서는 LLM 백엔드를 따로 고르지 않는다.
+- 로컬 워커가 기동하지 않거나 모델 로딩에 실패하면 LLM NPC는 실패 상태를 그대로 보여준다.
+- 같은 실패 설정으로는 매 턴 재기동을 반복하지 않는다.
+- 모델 원본은 수정하지 않는다.
+- 게임 런처 `./5Drawminigame.sh`는 모델이 없으면 공식 Hugging Face 저장소에서 자동 다운로드를 먼저 시도한다.
+- 자동 다운로드가 실패하면 공식 다운로드 경로와 배치 위치를 오류 문구로 안내한다.
 
-현재 프롬프트 구성은 둘로 나눈다.
+현재 프롬프트 구성은 셋으로 나눈다.
 
 - 행동 선택 프롬프트: `build_action_prompt(...)`
+- 정책 피드백 프롬프트: `build_policy_feedback_prompt(...)`
 - 대사 생성 프롬프트: `build_dialogue_prompt(...)`
 
 현재 구현 상태는 아래와 같이 구분한다.
 
 - 행동 선택 프롬프트는 LLM NPC 행동 선택 경로에 연결되어 있다.
+- 정책 피드백 프롬프트는 라운드 종료 후 ICRL 메모리 갱신 경로에 연결되어 있다.
 - 대사 생성 프롬프트는 대사 이벤트 호출부까지 연결되어 있다.
 - 행동 선택과 카드 교체 판단은 공개 로그와 자기 손패만 사용한다.
+- 정책 피드백 생성도 공개 로그와 라운드 결과만 사용한다.
 - 대사 생성도 공개 로그와 결과 요약만 사용한다.
 - 대사 생성 프롬프트는 플레이어에게 직접 말하는 2인칭 RP 대사 형식으로 강하게 제한한다.
 - 플레이어 손패 정보는 LLM NPC 프롬프트에 포함하지 않는다.
@@ -385,7 +440,7 @@ llmoker/data/prompts/dialogue/bluff_win.txt
   - 따라서 `.venv`가 아니라 `vendor + sqlite_compat`를 사용한다.
 - LLM 추론 계층
   - `llmoker/.venv/bin/python`에서 실행한다.
-  - `torch`, `transformers`, `accelerate`는 `.venv`에 설치한다.
+  - `torch`, `qwen-agent`, `transformers`는 `.venv`에 설치한다.
 - 향후 `sqlite-vec`를 붙일 경우
   - Ren'Py 본체가 직접 벡터 검색을 하면 `vendor` 경로를 검토한다.
   - LLM 백엔드 전용 벡터 검색이면 `.venv`에 두는 것을 기본으로 한다.
@@ -403,6 +458,9 @@ llmoker/data/prompts/dialogue/bluff_win.txt
 ```env
 LOCAL_LLM_PATH=./models/llm/qwen2.5-3b-instruct
 LLM_RUNNER_PYTHON=./.venv/bin/python
+LLM_MODEL_NAME=qwen3-4b-thinking
+LLM_MODEL_SERVER=http://127.0.0.1:8000/v1
+LLM_API_KEY=EMPTY
 MEMORY_DB_PATH=./data/memory/memory.sqlite3
 REPLAY_DB_PATH=./data/replays/replays.sqlite3
 SAVE_DB_PATH=./data/save/game_state.sqlite3
@@ -412,11 +470,8 @@ PyTorch는 현재 `cu130` 기준으로 설치한다.
 
 ```bash
 ./.venv/bin/python -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu130
-./.venv/bin/python -m pip install transformers==4.57.3 accelerate protobuf
-./.venv/bin/python -m pip install vllm bitsandbytes
+./.venv/bin/python -m pip install protobuf qwen-agent transformers
 ```
-
-현재 로컬 모델 검증 기준 버전은 `transformers==4.57.3`이다.
 
 ### 4.8 Ren'Py와 백엔드 연결 경계
 
@@ -478,24 +533,28 @@ PyTorch는 현재 `cu130` 기준으로 설치한다.
 ### 5.4 주석과 docstring 규칙
 
 - 새로 작성하는 함수와 클래스에는 docstring을 반드시 남긴다.
-- 형식은 아래를 고정으로 사용한다.
+- 기계적으로 찍은 템플릿형 docstring은 금지한다.
+- 함수 설명 뒤에 `Args:`와 `Returns:`를 실제 내용과 함께 남긴다.
+- `Args: 없음`, `Returns: 없음`, `함수명, ...` 같은 자동 생성 냄새가 나는 문구는 반복적으로 남발하지 않는다.
+- 정말 필요한 정보만 짧고 자연스러운 한국어 문장으로 적는다.
 
 ```python
 def example(arg1, arg2):
-    """example, 함수가 무엇을 하는지 한 줄로 설명한다.
+    """
+    현재 상태를 읽어서 다음 행동 후보를 정리한다.
 
     Args:
-        arg1: 첫 번째 인자 설명.
-        arg2: 두 번째 인자 설명.
+        arg1: 현재 상태 객체다.
+        arg2: 보조 설정 값이다.
 
     Returns:
-        반환값 설명.
+        다음 단계에서 사용할 행동 후보 목록이다.
     """
 ```
 
-- 클래스도 같은 형식으로 남긴다.
+- 클래스도 같은 원칙을 따른다.
 - docstring은 한국어로 작성한다.
-- 한 줄짜리 함수라도 역할이 명확하지 않으면 docstring을 남긴다.
+- 한 줄짜리 함수는 코드만으로 충분히 읽히면 docstring을 생략해도 된다.
 - 코드만 봐도 명확한 단순 대입에는 주석을 달지 않는다.
 - 규칙, 예외 처리, 상태 전이처럼 읽는 사람이 헷갈릴 수 있는 부분에는 짧은 주석을 남긴다.
 
@@ -518,10 +577,12 @@ def example(arg1, arg2):
 - 저장 기능을 위해 런타임 객체와 세이브용 상태 스냅샷을 분리한다.
 - Ren'Py screen의 버튼 액션에서 부작용이 있는 함수 호출은 `SetVariable(func())` 형태로 직접 쓰지 않고 `Function(...)` 액션으로 호출한다.
 - 상대 AI 모드 전환은 게임 도중 오버레이가 아니라 메인 메뉴 `환경 설정` 화면에서 변경하는 것을 기준으로 한다.
-- LLM 추론 백엔드 전환도 메인 메뉴 `환경 설정` 화면에서 변경하는 것을 기준으로 한다.
 - 메인 메뉴 배경은 `llmoker/game/gui/main.webm` 루프 영상으로 표시한다.
 - 포커 플레이 중 기본 배경은 `llmoker/game/images/minigames/normal.webm` 루프 영상으로 표시한다.
 - 라운드 종료 화면에서는 플레이어 승리 시 `lost.webm`, NPC 승리 시 `win.webm`를 사용한다.
+- 영상은 원본을 직접 재인코딩하지 않아도 Ren'Py 표시 단계에서 1920x1080으로 맞춰 보여준다.
+- 게임 시작 시 검은 화면 없이 바로 `normal.webm` 배경으로 진입한다.
+- 승패가 정해지면 해당 `win/lost.webm` 배경 위에서 대사가 먼저 진행되고, 그 다음 결과 화면을 연다.
 - 게임 UI에는 상대 비공개 정보를 숨기고, 같은 내용은 터미널 디버그 로그에서만 확인한다.
 
 ### 5.7 현재 구현 규칙
@@ -536,7 +597,7 @@ def example(arg1, arg2):
   - 두 번째 베팅
   - 쇼다운
 - LLM 경로는 행동 선택, 카드 교체 판단, 대사 생성까지 실제 연결된 상태를 유지한다.
-- LLM 실패 시에는 항상 합법 행동 폴백과 스크립트 대사 폴백이 가능해야 한다.
+- `LLM NPC` 모드에서는 실패 시 합법 행동이나 스크립트 대사로 숨기지 않고, 오류를 드러내서 먼저 해결하게 한다.
 - 매치 시작 전처럼 아직 손패가 배분되지 않은 상태도 엔진과 프롬프트가 안전하게 처리해야 한다.
 
 ### 5.8 폴더 구조 준수 규칙

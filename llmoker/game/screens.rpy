@@ -10,6 +10,12 @@ image llmoker_main_menu_video = Movie(
     loop=True,
 )
 
+transform llmoker_main_menu_video_fit:
+    xalign 0.5
+    yalign 0.5
+    xsize llmoker_gui_width
+    ysize llmoker_gui_height
+
 
 ################################################################################
 ## Styles
@@ -359,7 +365,7 @@ screen main_menu():
     ## This ensures that any other menu screen is replaced.
     tag menu
 
-    add "llmoker_main_menu_video"
+    add "llmoker_main_menu_video" at llmoker_main_menu_video_fit
 
     ## This empty frame darkens the main menu.
     frame:
@@ -388,17 +394,17 @@ style main_menu_title is main_menu_text
 style main_menu_version is main_menu_text
 
 style main_menu_frame:
-    xsize 420
+    xsize gui_scale(420)
     yfill True
 
     background "gui/overlay/main_menu.png"
 
 style main_menu_vbox:
     xalign 1.0
-    xoffset -30
-    xmaximum 1200
+    xoffset -gui_scale(30)
+    xmaximum gui_scale(1200)
     yalign 1.0
-    yoffset -30
+    yoffset -gui_scale(30)
 
 style main_menu_text:
     properties gui.text_properties("main_menu", accent=True)
@@ -424,7 +430,7 @@ screen game_menu(title, scroll=None, yinitial=0.0, spacing=0):
     style_prefix "game_menu"
 
     if main_menu:
-        add "llmoker_main_menu_video"
+        add "llmoker_main_menu_video" at llmoker_main_menu_video_fit
     else:
         add gui.game_menu_background
 
@@ -504,32 +510,32 @@ style return_button is navigation_button
 style return_button_text is navigation_button_text
 
 style game_menu_outer_frame:
-    bottom_padding 45
-    top_padding 180
+    bottom_padding gui_scale(45)
+    top_padding gui_scale(180)
 
     background "gui/overlay/game_menu.png"
 
 style game_menu_navigation_frame:
-    xsize 420
+    xsize gui_scale(420)
     yfill True
 
 style game_menu_content_frame:
-    left_margin 60
-    right_margin 30
-    top_margin 15
+    left_margin gui_scale(60)
+    right_margin gui_scale(30)
+    top_margin gui_scale(15)
 
 style game_menu_viewport:
-    xsize 1380
+    xsize gui_scale(1380)
 
 style game_menu_vscrollbar:
     unscrollable gui.unscrollable
 
 style game_menu_side:
-    spacing 15
+    spacing gui_scale(15)
 
 style game_menu_label:
-    xpos 75
-    ysize 180
+    xpos gui_scale(75)
+    ysize gui_scale(180)
 
 style game_menu_label_text:
     size gui.title_text_size
@@ -539,7 +545,7 @@ style game_menu_label_text:
 style return_button:
     xpos gui.navigation_xpos
     yalign 1.0
-    yoffset -45
+    yoffset -gui_scale(45)
 
 
 ## About screen ################################################################
@@ -764,13 +770,6 @@ screen preferences():
                         text "현재 선택: [store.poker_bot_mode == 'llm_npc' and 'LLM NPC' or '스크립트봇']"
                         textbutton "LLM NPC 사용" action Function(apply_poker_bot_mode, "llm_npc")
                         textbutton "스크립트봇 사용" action Function(apply_poker_bot_mode, "script_bot")
-
-                    vbox:
-                        style_prefix "radio"
-                        label "LLM 추론 백엔드"
-                        text "현재 선택: [ensure_backend_config().llm_backend == 'vllm' and 'vLLM 4비트' or 'Transformers']"
-                        textbutton "vLLM 4비트 사용" action Function(apply_poker_llm_backend, "vllm", "bitsandbytes")
-                        textbutton "Transformers 사용" action Function(apply_poker_llm_backend, "transformers", "none")
 
                 ## Additional vboxes of type "radio_pref" or "check_pref" can be
                 ## added here, to add additional creator-defined preferences.
