@@ -1,4 +1,4 @@
-"""게임 없이 Qwen 런타임 추론을 직접 확인하는 개발용 스크립트다."""
+"""게임 없이 현재 transformers 런타임 작업을 직접 확인하는 개발용 스크립트다."""
 
 from __future__ import annotations
 
@@ -41,8 +41,8 @@ def build_context():
                 "허용 행동: check, bet",
             ]
         ),
-        "recent_feedback": ["초반 원페어로는 과한 압박보다 체크가 안전했다."],
-        "long_term_memory": ["상대는 초반에 크게 흔들리지 않고 드로우 후 반응한다."],
+        "recent_feedback": ["초반 원페어는 무리한 압박보다 안전하게 굴리는 편이 나았다."],
+        "long_term_memory": ["상대는 초반 액션을 보고 다음 선택을 바꾸는 편이다."],
         "recent_log": ["라운드 1 시작", "서로 5칩 앤티를 냈다"],
         "round_summary": {
             "winner": "플레이어",
@@ -69,7 +69,13 @@ def build_payloads():
             "name": "dialogue",
             "payload": {
                 "mode": "dialogue",
-                "prompt": build_dialogue_prompt("match_intro", None, "플레이어", "사야"),
+                "prompt": build_dialogue_prompt(
+                    event_name="match_intro",
+                    recent_log=context["recent_log"],
+                    result_summary=None,
+                    player_name="플레이어",
+                    bot_name="사야",
+                ),
                 "context": context,
                 "event_name": "match_intro",
                 "max_new_tokens": 64,
@@ -109,7 +115,7 @@ def build_payloads():
 
 def build_client():
     """
-    현재 프로젝트 설정을 읽어 Qwen 런타임 클라이언트를 만든다.
+    현재 프로젝트 설정을 읽어 transformers 런타임 클라이언트를 만든다.
 
     Returns:
         모델 경로와 포트를 포함해 준비된 `QwenRuntimeClient` 객체다.
@@ -122,13 +128,12 @@ def build_client():
         runtime_python=config.llm_runtime_python,
         device=config.llm_device,
         runtime_port=config.llm_runtime_port,
-        vllm_port=config.llm_vllm_port,
     )
 
 
 def main():
     """
-    게임을 켜지 않고 Qwen 런타임의 핵심 추론 경로를 직접 점검한다.
+    게임을 켜지 않고 현재 런타임의 핵심 추론 경로를 직접 점검한다.
     런타임 시작 여부를 먼저 확인하고, 시작되면 대사·행동·교체·회고 요청을 차례대로 보내 결과를 JSON으로 출력한다.
 
     Returns:

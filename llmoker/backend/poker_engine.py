@@ -65,10 +65,8 @@ class PokerMatch:
             config.llm_model_name,
             config.llm_runtime_python,
             config.llm_device,
-            config.llm_gpu_memory_utilization,
             memory_manager,
             config.llm_runtime_port,
-            config.llm_vllm_port,
         )
         self.policy_loop = PolicyLoop(memory_manager, self.llm_agent)
         self.player = PlayerState(player_name, config.starting_stack)
@@ -157,6 +155,7 @@ class PokerMatch:
             "last_llm_reason": self.last_llm_reason,
             "llm_model_name": self.config.llm_model_name,
             "llm_device": self.config.llm_device,
+            "memory_snapshot": self.memory_manager.export_character_memory(self.bot.name),
         }
 
     @classmethod
@@ -208,12 +207,14 @@ class PokerMatch:
         match.last_llm_reason = snapshot.get("last_llm_reason", "")
         match.config.llm_model_name = snapshot.get("llm_model_name", config.llm_model_name)
         match.config.llm_device = snapshot.get("llm_device", config.llm_device)
+        match.memory_manager.replace_character_memory(
+            match.bot.name,
+            snapshot.get("memory_snapshot", {}),
+        )
         match.llm_agent.reconfigure(
             llm_model_name=match.config.llm_model_name,
             llm_device=match.config.llm_device,
-            llm_gpu_memory_utilization=match.config.llm_gpu_memory_utilization,
             llm_runtime_port=match.config.llm_runtime_port,
-            llm_vllm_port=match.config.llm_vllm_port,
         )
         match._apply_bot_mode_name()
         return match
@@ -287,7 +288,7 @@ class PokerMatch:
             LLM 실행 경로를 설명하는 문자열이다.
         """
 
-        return "Qwen-Agent(vLLM)"
+        return "Transformers 런타임"
 
     def format_bot_hand_for_prompt(self):
         """
@@ -621,7 +622,7 @@ class PokerMatch:
         actor = self.player if actor_name == "player" else self.bot
         contribution = self.player_contribution if actor_name == "player" else self.bot_contribution
         to_call = max(0, self.current_bet - contribution)
-        actions = []
+        actions = ["fold"]
 
         if to_call == 0:
             actions.append("check")
@@ -629,7 +630,6 @@ class PokerMatch:
                 actions.append("bet")
             return actions
 
-        actions.append("fold")
         if actor.stack >= to_call:
             actions.append("call")
         if (

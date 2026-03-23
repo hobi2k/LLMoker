@@ -1,5 +1,5 @@
 """
-처음 실행하는 환경에서 Qwen 모델이 없으면 다운로드를 준비한다.
+처음 실행하는 환경에서 기본 LLM 모델이 없으면 다운로드를 준비한다.
 """
 
 from __future__ import annotations
@@ -10,8 +10,8 @@ import subprocess
 import sys
 
 
-MODEL_REPO_ID = "Qwen/Qwen3-4B-Instruct-2507-FP8"
-MODEL_DIRNAME = "qwen3-4b-instruct-fp8"
+MODEL_REPO_ID = "Qwen/Qwen3-4B-Instruct-2507"
+MODEL_DIRNAME = "qwen3-4b-instruct-2507"
 
 
 def project_root() -> str:
@@ -28,7 +28,7 @@ def project_root() -> str:
 
 def model_dir() -> str:
     """
-    기본 Qwen 모델을 저장할 로컬 폴더 경로를 만든다.
+    기본 LLM 모델을 저장할 로컬 폴더 경로를 만든다.
     실제 다운로드 함수와 존재 여부 검사 함수가 같은 경로 계산을 재사용하도록 분리했다.
 
     Returns:
@@ -76,8 +76,8 @@ def ensure_huggingface_hub() -> None:
 
 def download_model() -> None:
     """
-    공식 Hugging Face 저장소에서 기본 Qwen 모델을 내려받는다.
-    모델 파일은 항상 `models/llm/qwen3-4b-instruct-fp8` 아래에 모아 둬 런타임과 문서가 같은 위치를 바라보게 한다.
+    공식 Hugging Face 저장소에서 기본 모델을 내려받는다.
+    모델 파일은 항상 `models/llm/qwen3-4b-instruct-2507` 아래에 모아 둬 런타임과 문서가 같은 위치를 바라보게 한다.
     """
 
     ensure_huggingface_hub()

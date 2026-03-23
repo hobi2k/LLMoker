@@ -8,7 +8,6 @@ dependencies = []
 
 [project.optional-dependencies]
 llm = [
-    "qwen-agent>=0.0.24",
     "numpy>=1.26",
     "pydantic>=2.12",
     "pydantic-core>=2.41",

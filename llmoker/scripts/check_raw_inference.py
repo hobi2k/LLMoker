@@ -1,12 +1,10 @@
-"""Qwen-Agent를 거치지 않고 vLLM 모델에 직접 추론을 보내는 개발용 스크립트다."""
+"""에이전트 계층 없이 transformers 런타임의 raw chat 응답을 확인하는 개발용 스크립트다."""
 
 from __future__ import annotations
 
 import argparse
 import json
 import sys
-import urllib.error
-import urllib.request
 from pathlib import Path
 
 
@@ -20,10 +18,10 @@ from backend.llm.client import QwenRuntimeClient
 
 def build_client():
     """
-    현재 프로젝트 설정을 읽어 vLLM 런타임을 준비할 클라이언트를 만든다.
+    현재 프로젝트 설정을 읽어 transformers 런타임 클라이언트를 만든다.
 
     Returns:
-        런타임 시작과 상태 확인에 쓸 `QwenRuntimeClient` 객체다.
+        런타임 시작과 요청 전송에 쓸 클라이언트 객체다.
     """
 
     config = load_backend_config(str(PROJECT_ROOT))
@@ -33,105 +31,63 @@ def build_client():
         runtime_python=config.llm_runtime_python,
         device=config.llm_device,
         runtime_port=config.llm_runtime_port,
-        vllm_port=config.llm_vllm_port,
     )
 
 
-def build_messages(mode):
+def build_chat_payload(mode, max_tokens):
     """
-    에이전트 계층 없이 모델 자체 응답을 보기 위한 최소 메시지 묶음을 만든다.
+    raw chat 검사용 시스템/사용자 메시지를 만든다.
 
     Args:
-        mode: 어떤 종류의 raw 추론을 확인할지 정하는 이름이다.
+        mode: 어떤 종류의 raw 응답을 볼지 정하는 이름이다.
+        max_tokens: 최대 출력 토큰 수다.
 
     Returns:
-        OpenAI 호환 chat completions에 바로 넣을 메시지 목록이다.
+        런타임 `/run`에 보낼 raw chat 요청 사전이다.
     """
 
     if mode == "sanity":
-        return [
-            {"role": "system", "content": "당신은 한국어로만 답하는 비서다."},
-            {"role": "user", "content": "한 줄로만 답해. 안녕이라고만 말해."},
-        ]
+        return {
+            "mode": "chat",
+            "system_message": "당신은 한국어로만 답하는 비서다.",
+            "user_message": "한 줄로만 답해. 안녕이라고만 말해.",
+            "max_new_tokens": max_tokens,
+            "temperature": 0.3,
+            "top_p": 0.8,
+        }
 
     if mode == "dialogue":
-        return [
-            {
-                "role": "system",
-                "content": (
-                    "당신은 2인 5드로우 포커 테이블의 NPC 사야다. "
-                    "여유 있고 장난스럽지만 짧게 압박하는 말투를 쓴다. "
-                    "플레이어에게 직접 말하는 한국어 대사만 한 줄 또는 두 줄로 답한다."
-                ),
-            },
-            {
-                "role": "user",
-                "content": (
-                    "이벤트: match_intro\n"
-                    "상황: 막 첫 판이 시작됐다.\n"
-                    "목표: 첫인상에서 상대를 가볍게 떠본다.\n"
-                    "설명하지 말고 실제 대사만 답해."
-                ),
-            },
-        ]
+        return {
+            "mode": "chat",
+            "system_message": "\n".join(
+                [
+                    "너는 포커를 플레이하는 캐릭터 사야다.",
+                    "플레이어에게 직접 건네는 한국어 대사만 한 줄 또는 두 줄로 답한다.",
+                    "짧은 반말로 자연스럽게 말한다.",
+                    "설명, 영어, JSON은 쓰지 않는다.",
+                ]
+            ),
+            "user_message": "\n".join(
+                [
+                    "이벤트: match_intro",
+                    "상황: 첫 판이 막 시작됐다.",
+                    "상대를 가볍게 떠보는 한마디만 바로 말해.",
+                ]
+            ),
+            "max_new_tokens": max_tokens,
+            "temperature": 0.45,
+            "top_p": 0.9,
+        }
 
     raise ValueError("지원하지 않는 mode입니다: %s" % mode)
 
 
-def request_raw_completion(client, messages, max_tokens):
-    """
-    vLLM OpenAI 호환 서버에 직접 chat completions 요청을 보낸다.
-
-    Args:
-        client: 준비된 런타임 클라이언트다.
-        messages: chat completions 메시지 목록이다.
-        max_tokens: 최대 출력 토큰 수다.
-
-    Returns:
-        서버 JSON 응답 사전이다.
-    """
-
-    body = {
-        "model": client.model_name,
-        "messages": messages,
-        "temperature": 0.6,
-        "top_p": 0.95,
-        "max_tokens": max_tokens,
-    }
-    request = urllib.request.Request(
-        "http://127.0.0.1:%d/v1/chat/completions" % client.vllm_port,
-        data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(request, timeout=180) as response:
-        return json.loads(response.read().decode("utf-8"))
-
-
-def probe_vllm(client):
-    """
-    raw completions를 보내기 전에 vLLM OpenAI 호환 엔드포인트가 실제로 살아 있는지 확인한다.
-
-    Args:
-        client: 준비된 런타임 클라이언트다.
-
-    Returns:
-        models 엔드포인트 JSON 응답 사전이다.
-    """
-
-    with urllib.request.urlopen(
-        "http://127.0.0.1:%d/v1/models" % client.vllm_port,
-        timeout=30,
-    ) as response:
-        return json.loads(response.read().decode("utf-8"))
-
-
 def main():
     """
-    모델 자체 응답을 직접 확인해 agent 레이어 문제인지 모델 출력 문제인지 분리한다.
+    모델 자체 raw 응답을 확인해 프롬프트와 파서 문제를 분리한다.
 
     Returns:
-        raw completions 호출이 성공하면 0, 실패하면 1을 반환한다.
+        성공하면 0, 실패하면 1이다.
     """
 
     parser = argparse.ArgumentParser()
@@ -150,37 +106,19 @@ def main():
         )
         return 1
 
-    try:
-        probe = probe_vllm(client)
-        result = request_raw_completion(client, build_messages(args.mode), args.max_tokens)
-        print(
-            json.dumps(
-                {
-                    "probe": probe,
-                    "result": result,
-                },
-                ensure_ascii=False,
-                indent=2,
-            )
+    health = client.runtime_info()
+    result = client.request(build_chat_payload(args.mode, args.max_tokens), timeout_seconds=180)
+    print(
+        json.dumps(
+            {
+                "health": health,
+                "result": result,
+            },
+            ensure_ascii=False,
+            indent=2,
         )
-        return 0
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="ignore")
-        print(
-            json.dumps(
-                {
-                    "status": "error",
-                    "stage": "http",
-                    "code": exc.code,
-                    "url": exc.url,
-                    "message": exc.reason,
-                    "body": body,
-                },
-                ensure_ascii=False,
-                indent=2,
-            )
-        )
-        return 1
+    )
+    return 0 if result.get("status") == "ok" else 1
 
 
 if __name__ == "__main__":

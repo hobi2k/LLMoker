@@ -40,6 +40,7 @@ init python:
                     store.poker_match_state,
                 )
             else:
+                store._poker_memory_manager.clear_all()
                 store._poker_match_runtime = PokerMatch(
                     backend_config,
                     store._poker_memory_manager,
@@ -52,9 +53,7 @@ init python:
                 local_model_path=backend_config.local_llm_path,
                 llm_runtime_python=backend_config.llm_runtime_python,
                 llm_device=backend_config.llm_device,
-                llm_gpu_memory_utilization=backend_config.llm_gpu_memory_utilization,
                 llm_runtime_port=backend_config.llm_runtime_port,
-                llm_vllm_port=backend_config.llm_vllm_port,
             )
 
         return store._poker_match_runtime

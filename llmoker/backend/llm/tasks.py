@@ -1,4 +1,4 @@
-"""Qwen-Agent가 처리할 포커 작업을 명시적인 태스크 단위로 정의한다."""
+"""LLM 런타임이 처리할 포커 작업을 명시적인 태스크 단위로 정의한다."""
 
 from __future__ import annotations
 
@@ -55,13 +55,13 @@ def _compress_memory_items(items, limit=1):
 @dataclass
 class PokerAgentTask:
     """
-    Qwen-Agent 브리지 런타임에 전달할 한 번의 작업 요청을 묶는다.
-    포커 엔진은 어떤 작업을 시키는지만 결정하고, 실제 프롬프트와 tool context 구성은 이 구조를 통해 넘긴다.
+    런타임에 전달할 한 번의 작업 요청을 묶는다.
+    포커 엔진은 어떤 작업을 시키는지만 결정하고, 실제 프롬프트와 공개 문맥 구성은 이 구조를 통해 넘긴다.
 
     Args:
         mode: 브리지 런타임이 어떤 종류의 작업으로 해석할지 나타내는 문자열이다.
-        prompt: Qwen-Agent에 전달할 사용자 프롬프트다.
-        context: tool calling으로 노출할 공개 상태와 기억 사전이다.
+        prompt: 런타임에 전달할 사용자 프롬프트다.
+        context: 공개 상태와 기억을 담은 사전이다.
         metadata: 작업별 추가 검증에 쓸 부가 정보 사전이다.
     """
 
@@ -89,7 +89,7 @@ class PokerAgentTask:
 
 def build_shared_context(match, legal_actions, recent_feedback, long_term_memory, recent_log_limit=2):
     """
-    행동, 드로우, 대사 작업이 공통으로 쓰는 tool context를 만든다.
+    행동, 드로우, 대사 작업이 공통으로 쓰는 공개 문맥을 만든다.
 
     Args:
         match: 현재 포커 매치 객체다.
@@ -112,9 +112,31 @@ def build_shared_context(match, legal_actions, recent_feedback, long_term_memory
     }
 
 
+def build_decision_context(match, legal_actions):
+    """
+    행동과 카드 교체 판단에 필요한 최소 공개 문맥만 만든다.
+
+    Args:
+        match: 현재 포커 매치 객체다.
+        legal_actions: 현재 턴 기준 허용 행동 목록이다.
+
+    Returns:
+        공개 상태와 최근 공개 로그만 담은 context 사전이다.
+    """
+
+    return {
+        "public_state": build_public_state_text(match, legal_actions),
+        "recent_feedback": [],
+        "long_term_memory": [],
+        "recent_log": [_clip_text(line) for line in match.get_public_log_lines(limit=2)],
+        "player_name": match.player.name,
+        "bot_name": match.bot.name,
+    }
+
+
 def build_action_task(match, legal_actions, recent_feedback, long_term_memory):
     """
-    현재 베팅 턴 행동을 고르게 할 Qwen-Agent 작업을 만든다.
+    현재 베팅 턴 행동을 고르게 할 작업을 만든다.
 
     Args:
         match: 현재 포커 매치 객체다.
@@ -129,7 +151,7 @@ def build_action_task(match, legal_actions, recent_feedback, long_term_memory):
     return PokerAgentTask(
         mode="action",
         prompt=build_action_prompt(legal_actions),
-        context=build_shared_context(match, legal_actions, recent_feedback, long_term_memory),
+        context=build_decision_context(match, legal_actions),
         metadata={
             "legal_actions": legal_actions,
             "max_new_tokens": 48,
@@ -139,7 +161,7 @@ def build_action_task(match, legal_actions, recent_feedback, long_term_memory):
 
 def build_draw_task(match, max_discards, recent_feedback, long_term_memory):
     """
-    카드 교체 인덱스를 판단하게 할 Qwen-Agent 작업을 만든다.
+    카드 교체 인덱스를 판단하게 할 작업을 만든다.
 
     Args:
         match: 현재 포커 매치 객체다.
@@ -154,7 +176,7 @@ def build_draw_task(match, max_discards, recent_feedback, long_term_memory):
     return PokerAgentTask(
         mode="draw",
         prompt=build_draw_prompt(max_discards),
-        context=build_shared_context(match, [], recent_feedback, long_term_memory),
+        context=build_decision_context(match, []),
         metadata={
             "max_discards": max_discards,
             "max_new_tokens": 48,
@@ -164,7 +186,7 @@ def build_draw_task(match, max_discards, recent_feedback, long_term_memory):
 
 def build_dialogue_task(match, event_name, result_summary, recent_feedback, long_term_memory):
     """
-    심리전 대사를 생성하게 할 Qwen-Agent 작업을 만든다.
+    심리전 대사를 생성하게 할 작업을 만든다.
 
     Args:
         match: 현재 포커 매치 객체다.
@@ -181,10 +203,13 @@ def build_dialogue_task(match, event_name, result_summary, recent_feedback, long
     if match.phase in ("betting1", "betting2") and not match.round_over:
         legal_actions = match._get_available_actions("bot")
 
+    recent_public_log = match.get_public_log_lines(limit=2)
+
     return PokerAgentTask(
         mode="dialogue",
         prompt=build_dialogue_prompt(
             event_name=event_name,
+            recent_log=recent_public_log,
             result_summary=result_summary,
             player_name=match.player.name,
             bot_name=match.bot.name,
@@ -199,7 +224,7 @@ def build_dialogue_task(match, event_name, result_summary, recent_feedback, long
 
 def build_policy_task(round_summary, public_log, bot_name, recent_feedback, long_term_memory):
     """
-    라운드 회고와 다음 전략 초점을 생성하게 할 Qwen-Agent 작업을 만든다.
+    라운드 회고와 다음 전략 초점을 생성하게 할 작업을 만든다.
 
     Args:
         round_summary: 라운드 종료 요약 사전이다.
@@ -223,5 +248,5 @@ def build_policy_task(round_summary, public_log, bot_name, recent_feedback, long
             "public_state": "",
             "bot_name": bot_name,
         },
-        metadata={"max_new_tokens": 96},
+        metadata={"max_new_tokens": 384},
     )

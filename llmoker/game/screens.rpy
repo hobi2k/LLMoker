@@ -16,6 +16,12 @@ transform llmoker_main_menu_video_fit:
     xsize llmoker_gui_width
     ysize llmoker_gui_height
 
+transform llmoker_neon_breathe:
+    alpha 0.82
+    linear 1.2 alpha 1.0
+    linear 1.2 alpha 0.82
+    repeat
+
 
 ################################################################################
 ## Styles
@@ -144,11 +150,14 @@ style namebox_label is say_label
 
 style window:
     xalign 0.5
-    xfill True
-    yalign gui.textbox_yalign
+    xmaximum gui_scale(940)
+    yalign 1.0
     ysize gui.textbox_height
-
-    background Image("gui/textbox.png", xalign=0.5, yalign=1.0)
+    left_padding gui_scale(28)
+    right_padding gui_scale(28)
+    top_padding gui_scale(12)
+    bottom_padding gui_scale(14)
+    background "#06080dcf"
 
 style namebox:
     xpos gui.name_xpos
@@ -156,23 +165,26 @@ style namebox:
     xsize gui.namebox_width
     ypos gui.name_ypos
     ysize gui.namebox_height
-
-    background Frame("gui/namebox.png", gui.namebox_borders, tile=gui.namebox_tile, xalign=gui.name_xalign)
-    padding gui.namebox_borders.padding
+    left_padding gui_scale(12)
+    right_padding gui_scale(12)
+    top_padding gui_scale(5)
+    bottom_padding gui_scale(5)
+    background "#09172be8"
 
 style say_label:
     properties gui.text_properties("name", accent=True)
+    color "#27a7ff"
     xalign gui.name_xalign
     yalign 0.5
+    outlines [(1, "#07111d", 0, 0)]
 
 style say_dialogue:
     properties gui.text_properties("dialogue")
-
     xpos gui.dialogue_xpos
     xsize gui.dialogue_width
     ypos gui.dialogue_ypos
-
     adjust_spacing False
+    outlines [(1, "#04070d", 0, 0)]
 
 ## Input screen ################################################################
 ##
@@ -349,9 +361,21 @@ style navigation_button_text is gui_button_text
 style navigation_button:
     size_group "navigation"
     properties gui.button_properties("navigation_button")
+    xminimum gui_scale(232)
+    left_padding gui_scale(22)
+    right_padding gui_scale(22)
+    top_padding gui_scale(12)
+    bottom_padding gui_scale(12)
+    background "#06101be4"
+    hover_background "#13243adf"
 
 style navigation_button_text:
     properties gui.text_properties("navigation_button")
+    font "fonts/malgunbd.ttf"
+    size gui_scale(25)
+    color "#e7f3ff"
+    hover_color "#ffffff"
+    outlines [(1, "#071019", 0, 0)]
 
 
 ## Main Menu screen ############################################################
@@ -367,6 +391,7 @@ screen main_menu():
     on "show" action Function(play_main_menu_music)
 
     add "llmoker_main_menu_video" at llmoker_main_menu_video_fit
+    add Solid("#02030518")
 
     ## This empty frame darkens the main menu.
     frame:
@@ -378,43 +403,49 @@ screen main_menu():
 
     if gui.show_name:
 
-        vbox:
-            style "main_menu_vbox"
+        fixed:
+            style "main_menu_brand_panel"
+
+            text "[config.name!t]":
+                style "main_menu_title_glow"
+                at llmoker_neon_breathe
 
             text "[config.name!t]":
                 style "main_menu_title"
 
-            text "[config.version]":
-                style "main_menu_version"
-
 
 style main_menu_frame is empty
-style main_menu_vbox is vbox
 style main_menu_text is gui_text
 style main_menu_title is main_menu_text
+style main_menu_title_glow is main_menu_text
 style main_menu_version is main_menu_text
+style main_menu_brand_panel is empty
 
 style main_menu_frame:
-    xsize gui_scale(420)
+    xsize gui_scale(318)
     yfill True
+    background "#040a14eb"
 
-    background "gui/overlay/main_menu.png"
-
-style main_menu_vbox:
-    xalign 1.0
-    xoffset -gui_scale(30)
-    xmaximum gui_scale(1200)
-    yalign 1.0
-    yoffset -gui_scale(30)
+style main_menu_brand_panel:
+    xpos gui_scale(430)
+    ypos gui_scale(26)
+    xmaximum gui_scale(500)
+    ymaximum gui_scale(210)
 
 style main_menu_text:
     properties gui.text_properties("main_menu", accent=True)
 
 style main_menu_title:
-    properties gui.text_properties("title")
+    font "fonts/malgunbd.ttf"
+    size gui_scale(110)
+    color "#fff7fb"
+    outlines [(2, "#260b15", 0, 0), (8, "#ff5fb85c", 0, 0)]
 
-style main_menu_version:
-    properties gui.text_properties("version")
+style main_menu_title_glow:
+    font "fonts/malgunbd.ttf"
+    size gui_scale(110)
+    color "#ff4da8"
+    outlines [(14, "#ff4da899", 0, 0), (24, "#ff4da855", 0, 0), (36, "#ff4da822", 0, 0)]
 
 
 ## Game Menu screen ############################################################

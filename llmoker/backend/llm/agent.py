@@ -18,13 +18,11 @@ class LocalLLMAgent:
 
     Args:
         local_model_path: 로컬 모델 폴더 경로다.
-        llm_model_name: vLLM served model 이름이다.
+        llm_model_name: 표시용 모델 이름이다.
         llm_runtime_python: 런타임을 띄울 Python 3.11 실행 파일 경로다.
-        llm_device: vLLM 실행 디바이스 힌트다.
-        llm_gpu_memory_utilization: vLLM이 사용할 GPU 메모리 비율이다.
+        llm_device: transformers 실행 디바이스 힌트다.
         memory_manager: 기억 저장소 객체다.
         runtime_port: 런타임 HTTP 서버 포트다.
-        vllm_port: 내부 vLLM 포트다.
     """
 
     def __init__(
@@ -33,10 +31,8 @@ class LocalLLMAgent:
         llm_model_name,
         llm_runtime_python,
         llm_device,
-        llm_gpu_memory_utilization,
         memory_manager,
         runtime_port=8011,
-        vllm_port=8000,
     ):
         self.memory_manager = memory_manager
         self.client = QwenRuntimeClient(
@@ -44,9 +40,7 @@ class LocalLLMAgent:
             model_name=llm_model_name,
             runtime_python=llm_runtime_python,
             device=llm_device,
-            gpu_memory_utilization=llm_gpu_memory_utilization,
             runtime_port=runtime_port,
-            vllm_port=vllm_port,
         )
         self.last_status = "Qwen 런타임이 아직 시작되지 않았습니다."
 
@@ -56,9 +50,7 @@ class LocalLLMAgent:
         llm_model_name=None,
         llm_runtime_python=None,
         llm_device=None,
-        llm_gpu_memory_utilization=None,
         llm_runtime_port=None,
-        llm_vllm_port=None,
     ):
         """
         런타임 설정을 바꾼다.
@@ -68,9 +60,7 @@ class LocalLLMAgent:
             llm_model_name: 새 모델 이름이다.
             llm_runtime_python: 새 Python 3.11 경로다.
             llm_device: 새 디바이스 힌트다.
-            llm_gpu_memory_utilization: 새 GPU 메모리 사용 비율이다.
             llm_runtime_port: 새 런타임 포트다.
-            llm_vllm_port: 새 vLLM 포트다.
         """
 
         self.client.configure(
@@ -78,9 +68,7 @@ class LocalLLMAgent:
             model_name=llm_model_name,
             runtime_python=llm_runtime_python,
             device=llm_device,
-            gpu_memory_utilization=llm_gpu_memory_utilization,
             runtime_port=llm_runtime_port,
-            vllm_port=llm_vllm_port,
         )
         self.last_status = self.client.last_status
 
@@ -214,8 +202,8 @@ class LocalLLMAgent:
 
         text = str(response.get("text", "")).strip()
         if not text:
-            return build_error_result("Qwen-Agent가 유효한 심리전 대사를 만들지 못했습니다.", text="")
-        return build_success_result(text=text, reason="Qwen-Agent 대사 생성 성공")
+            return build_error_result("LLM이 유효한 심리전 대사를 만들지 못했습니다.", text="")
+        return build_success_result(text=text, reason="LLM 대사 생성 성공")
 
     def generate_policy_feedback(self, round_summary, public_log, bot_name):
         """
