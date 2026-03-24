@@ -25,6 +25,8 @@ label poker_phase_loop:
             jump poker_runtime_error
 
         $ update_status_from_messages(round_messages, fallback="행동을 완료했습니다.")
+        if get_poker_match().round_over:
+            jump poker_round_end
         $ play_dialogue_event("betting", round_messages)
         jump poker_phase_loop
 
@@ -37,6 +39,8 @@ label poker_phase_loop:
         if poker_fatal_error_text:
             jump poker_runtime_error
         $ update_status_from_messages(round_messages, fallback="드로우를 완료했습니다.")
+        if get_poker_match().round_over:
+            jump poker_round_end
         jump poker_phase_loop
 
     jump poker_round_end
@@ -46,10 +50,12 @@ label poker_round_end:
     $ poker_status_text = "라운드가 종료되었습니다."
     $ poker_round_summary_text = "\n".join(get_poker_match().get_round_summary_lines())
     $ sync_poker_match_state()
+    show screen poker_table_screen(mode="round_end")
     $ play_dialogue_event("round_end")
     if get_poker_match().is_match_finished():
         $ play_dialogue_event("match_end")
 
+    hide screen poker_table_screen
     $ next_action = renpy.call_screen("poker_table_screen", mode="round_end")
     if next_action == "next":
         jump poker_minigame

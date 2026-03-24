@@ -1,6 +1,7 @@
 init python:
     import os
     import sys
+    import threading
 
     vendor_dir = os.path.join(config.basedir, "vendor")
     if vendor_dir not in sys.path:
@@ -10,6 +11,14 @@ init python:
     from backend.poker_engine import PokerMatch, card_image_path
     from backend.replay_logger import ReplayLogger
     from backend.save_state_store import SaveStateStore
+
+    _llm_prewarm_state = {
+        "started": False,
+        "done": False,
+        "ok": False,
+        "status": "LLM 런타임이 아직 시작되지 않았습니다.",
+        "thread": None,
+    }
 
     def ensure_poker_runtime():
         """
@@ -201,8 +210,8 @@ init python:
 
     def start_llm_npc():
         """
-        게임 화면에 들어온 직후 Qwen 런타임을 미리 올려 첫 대사나 첫 행동에서 생기는 초기 지연을 줄인다.
-        현재 상대가 스크립트봇이면 아무것도 띄우지 않고 바로 성공으로 처리한다.
+        게임 시작 전에 Qwen 런타임을 준비한다.
+        스플래시에서 백그라운드 예열이 시작된 경우, 여기서는 그 결과를 이어받는다.
 
         Returns:
             준비 성공 여부다.
@@ -211,9 +220,63 @@ init python:
         match = ensure_poker_runtime()
         if match.bot_mode != "llm_npc":
             return True
+        if _llm_prewarm_state["done"]:
+            store.poker_status_text = _llm_prewarm_state["status"]
+            return _llm_prewarm_state["ok"]
+
         ready = match.llm_agent.start()
         store.poker_status_text = match.llm_agent.last_status
+        _llm_prewarm_state["started"] = True
+        _llm_prewarm_state["done"] = True
+        _llm_prewarm_state["ok"] = ready
+        _llm_prewarm_state["status"] = match.llm_agent.last_status
         return ready
+
+    def begin_llm_npc_prewarm():
+        """
+        스플래시가 재생되는 동안 Qwen 런타임을 백그라운드에서 예열한다.
+        이미 예열이 시작됐거나 상대가 스크립트봇이면 추가 작업을 하지 않는다.
+        """
+
+        match = ensure_poker_runtime()
+        if match.bot_mode != "llm_npc":
+            _llm_prewarm_state["started"] = True
+            _llm_prewarm_state["done"] = True
+            _llm_prewarm_state["ok"] = True
+            _llm_prewarm_state["status"] = "스크립트봇 모드라 LLM 예열이 필요하지 않습니다."
+            return
+        if _llm_prewarm_state["started"]:
+            return
+
+        _llm_prewarm_state["started"] = True
+        _llm_prewarm_state["done"] = False
+        _llm_prewarm_state["ok"] = False
+        _llm_prewarm_state["status"] = "Qwen 런타임 예열 중입니다."
+
+        def _worker():
+            ready = match.llm_agent.start()
+            _llm_prewarm_state["ok"] = ready
+            _llm_prewarm_state["done"] = True
+            _llm_prewarm_state["status"] = match.llm_agent.last_status
+
+        thread = threading.Thread(target=_worker, name="llm-prewarm", daemon=True)
+        _llm_prewarm_state["thread"] = thread
+        thread.start()
+
+    def finish_llm_npc_prewarm():
+        """
+        스플래시가 끝나기 전에 백그라운드 예열을 마무리한다.
+        남은 대기 시간이 있더라도 게임 시작 직전이 아니라 시작 연출 안에서 흡수한다.
+
+        Returns:
+            준비 성공 여부다.
+        """
+
+        thread = _llm_prewarm_state["thread"]
+        if thread is not None and thread.is_alive():
+            thread.join()
+        store.poker_status_text = _llm_prewarm_state["status"]
+        return _llm_prewarm_state["ok"]
 
     def safe_resolve_player_action(action):
         """

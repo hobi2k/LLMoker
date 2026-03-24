@@ -2,21 +2,9 @@
 errors listed below, and try again.
 
 
-File "game/poker_minigame.rpy", line 140: expected statement.
-    for line in round_messages:
-             ^
-
-File "game/poker_minigame.rpy", line 158: expected statement.
-    for line in round_messages:
-             ^
-
-File "game/poker_minigame.rpy", line 167: expected statement.
-    for line in round_messages:
-             ^
-
-File "game/poker_minigame.rpy", line 175: expected statement.
-    for line in poker_match.get_round_summary_lines():
-             ^
+File "game/screens.rpy", line 1116: Line is indented, but the preceding style_prefix statement does not expect a block. Please check this line's indentation. You may have forgotten a colon (:).
+    vbox:
+    ^
 
 Ren'Py Version: Ren'Py 8.2.1.24030407
-Sun Mar 15 23:45:12 2026
+Tue Mar 24 23:03:40 2026

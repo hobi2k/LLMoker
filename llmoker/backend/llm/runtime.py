@@ -7,6 +7,7 @@ import copy
 import json
 import re
 import sys
+import traceback
 
 import torch
 from qwen_agent.agents import FnCallAgent
@@ -53,6 +54,44 @@ def preview_text(text, limit=180):
     if len(compact) <= limit:
         return compact
     return compact[:limit] + "..."
+
+
+def trace_runtime(stage, **fields):
+    """
+    런타임 내부 분기와 오류 원인을 stderr에 짧게 남긴다.
+
+    Args:
+        stage: 현재 추적 단계 이름이다.
+        **fields: 함께 남길 부가 정보다.
+    """
+
+    parts = ["[LLMoker][TRACE] %s" % stage]
+    for key, value in fields.items():
+        if value is None:
+            continue
+        if isinstance(value, (list, tuple, set)):
+            value = ", ".join(str(item) for item in value)
+        else:
+            value = str(value)
+        value = " ".join(value.split())
+        if value:
+            parts.append("%s=%s" % (key, value))
+    sys.stderr.write(" / ".join(parts) + "\n")
+    sys.stderr.flush()
+
+
+def strip_wrapping_quotes(text):
+    """
+    문자열 양끝의 불필요한 따옴표를 걷어낸다.
+
+    Args:
+        text: 정리할 문자열이다.
+
+    Returns:
+        따옴표가 제거된 문자열이다.
+    """
+
+    return re.sub(r'^[\"“”‘’]+|[\"“”‘’]+$', "", (text or "").strip()).strip()
 
 
 def looks_like_meta_response(text):
@@ -118,7 +157,7 @@ def extract_dialogue_text(text):
         if clean_text.startswith(prefix):
             clean_text = clean_text[len(prefix) :].strip()
             break
-    return clean_text
+    return strip_wrapping_quotes(clean_text)
 
 
 def strip_action_or_reason_prefix(text, legal_actions=None):
@@ -142,7 +181,7 @@ def strip_action_or_reason_prefix(text, legal_actions=None):
         action_pattern = r"^\s*(%s)\s*[:\-]?\s*" % "|".join(re.escape(action) for action in legal_actions)
         clean_text = re.sub(action_pattern, "", clean_text, flags=re.IGNORECASE)
     clean_text = re.sub(r"^\s*reason\s*:\s*", "", clean_text, flags=re.IGNORECASE)
-    return clean_text.strip()
+    return strip_wrapping_quotes(clean_text)
 
 
 def normalize_dialogue_text(text):
@@ -163,6 +202,7 @@ def normalize_dialogue_text(text):
     lines = []
     for line in clean_text.splitlines():
         stripped = line.strip()
+        stripped = strip_wrapping_quotes(stripped)
         if not stripped or looks_like_meta_response(stripped):
             continue
         lines.append(stripped)
@@ -184,6 +224,7 @@ def normalize_reason_text(text, fallback, legal_actions=None):
 
     clean_text = strip_action_or_reason_prefix(extract_dialogue_text(text), legal_actions=legal_actions)
     clean_text = re.sub(r"^\s*\[[0-4](?:\s*,\s*[0-4])*\]\s*(?:를|을)?\s*", "", clean_text)
+    clean_text = strip_wrapping_quotes(clean_text)
     if not clean_text or looks_like_meta_response(clean_text):
         return fallback
     return clean_text
@@ -226,7 +267,7 @@ def extract_action_payload(text, legal_actions):
     if isinstance(payload, dict):
         return payload
 
-    clean_text = (text or "").strip()
+    clean_text = strip_wrapping_quotes(text)
     if not clean_text or looks_like_meta_response(clean_text):
         return None
 
@@ -266,7 +307,7 @@ def extract_draw_payload(text):
     if isinstance(payload, dict):
         return payload
 
-    clean_text = (text or "").strip()
+    clean_text = strip_wrapping_quotes(text)
     if not clean_text or looks_like_meta_response(clean_text):
         return None
 
@@ -297,9 +338,11 @@ def build_dialogue_system_message():
             "짧은 반말로 자연스럽게 말한다.",
             "번역투나 과한 감탄사 없이 자연스러운 한국어 대화처럼 말한다.",
             "포커 테이블 맞은편 상대에게 바로 던지는 짧은 말처럼 말한다.",
+            "상대에게 직접 건네는 말만 한다.",
+            "독백, 요약, 해설이 아니라 상대를 향한 말이어야 한다.",
             "방금 벌어진 일 한 가지만 집어서 말한다.",
             "같은 사건 설명을 그대로 되풀이하지 않는다.",
-            "상대에게 직접 건네는 말만 한다.",
+            "질문, 비꼼, 도발, 기쁨, 분함 중 하나가 분명해야 한다.",
             "자기 이름을 직접 말하지 않는다.",
             "포커 외 다른 게임, 다른 규칙, 장면 설명, 방송 멘트, 작업 계획, 영어는 쓰지 않는다.",
             "없는 용어를 지어내지 않는다.",
@@ -319,6 +362,8 @@ def build_decision_system_message():
         [
             "너는 2인 5드로우 포커 NPC의 판단 모듈이다.",
             "도구로 공개 정보와 기억을 확인한 뒤 합법적인 결론만 짧게 낸다.",
+            "공개 사실에 적힌 수치, 족보 이름, 허용 행동만 그대로 사용한다.",
+            "공개 사실과 다른 숫자, 카드, 족보, 규칙을 지어내지 않는다.",
             "포커 외 다른 게임 규칙이나 비유를 섞지 않는다.",
             "최종 답은 요구된 형식 하나만 출력한다.",
         ]
@@ -392,10 +437,10 @@ def final_assistant_text(messages):
     for message in reversed(messages):
         if message is None:
             continue
-        role = message.get("role") if isinstance(message, dict) else message.role
+        role = message.get("role") if isinstance(message, dict) else getattr(message, "role", None)
         if role != "assistant":
             continue
-        function_call = message.get("function_call") if isinstance(message, dict) else message.function_call
+        function_call = message.get("function_call") if isinstance(message, dict) else getattr(message, "function_call", None)
         if function_call:
             continue
         text = message_text(message)
@@ -436,9 +481,12 @@ class LocalTransformersFnCallModel(BaseFnCallModel):
         for message in messages:
             if message is None:
                 continue
+            role = message.get("role") if isinstance(message, dict) else getattr(message, "role", None)
+            if not role:
+                continue
             payload.append(
                 {
-                    "role": message.role,
+                    "role": role,
                     "content": message_text(message),
                 }
             )
@@ -599,11 +647,6 @@ class QwenRuntime:
             llm=self.chat_model,
             system_message=build_decision_system_message(),
         )
-        self.dialogue_agent = FnCallAgent(
-            function_list=self.tool_list,
-            llm=self.chat_model,
-            system_message=build_dialogue_system_message(),
-        )
         self.policy_agent = FnCallAgent(
             function_list=self.tool_list,
             llm=self.chat_model,
@@ -661,6 +704,9 @@ class QwenRuntime:
 
         previous_generate_cfg = copy.deepcopy(agent.extra_generate_cfg)
         agent.extra_generate_cfg = copy.deepcopy(generate_cfg)
+        if not isinstance(context, dict):
+            trace_runtime("agent.invalid_context", context_type=type(context).__name__)
+            context = {}
         set_tool_context(context)
         try:
             final_response = []
@@ -700,16 +746,48 @@ class QwenRuntime:
         )
         action_payload = extract_action_payload(output_text, legal_actions)
         if action_payload is None or action_payload.get("action") not in legal_actions:
+            trace_runtime(
+                "action.invalid_output",
+                preview=preview_text(output_text),
+                legal_actions=legal_actions,
+            )
             return {"status": "error", "reason": "LLM이 허용되지 않은 행동을 반환했습니다. 출력 미리보기: %s" % preview_text(output_text)}
 
+        context = payload.get("context", {})
+        if not isinstance(context, dict):
+            context = {}
+        reason_text = normalize_reason_text(
+            str(action_payload.get("reason", "")).strip(),
+            "현재 공개 정보 기준으로 %s을 선택했다." % action_payload["action"],
+            legal_actions=legal_actions,
+        )
+        fact_anchors = [
+            str(context.get("hand_name", "")).strip(),
+            str(context.get("pot", "")).strip(),
+            str(context.get("current_bet", "")).strip(),
+            str(context.get("to_call", "")).strip(),
+            str(context.get("bot_stack", "")).strip(),
+            str(context.get("player_stack", "")).strip(),
+        ]
+        fact_anchors = [anchor for anchor in fact_anchors if anchor]
+        if fact_anchors and not any(anchor in reason_text for anchor in fact_anchors):
+            trace_runtime(
+                "action.reason.regrounded",
+                action=action_payload["action"],
+                hand_name=context.get("hand_name", ""),
+                pot=context.get("pot", ""),
+                to_call=context.get("to_call", ""),
+                preview=preview_text(reason_text),
+            )
+            reason_text = "현재 족보 %s와 콜 금액 %s를 보고 %s했다." % (
+                context.get("hand_name", ""),
+                context.get("to_call", ""),
+                action_payload["action"],
+            )
         return {
             "status": "ok",
             "action": action_payload["action"],
-            "reason": normalize_reason_text(
-                str(action_payload.get("reason", "")).strip(),
-                "현재 공개 정보 기준으로 %s을 선택했다." % action_payload["action"],
-                legal_actions=legal_actions,
-            ),
+            "reason": reason_text,
         }
 
     def handle_draw(self, payload):
@@ -735,7 +813,31 @@ class QwenRuntime:
         )
         draw_payload = extract_draw_payload(output_text)
         if draw_payload is None:
+            trace_runtime(
+                "draw.invalid_output",
+                preview=preview_text(output_text),
+                max_discards=payload.get("max_discards", 3),
+            )
             return {"status": "error", "reason": "LLM 응답에서 카드 교체 결론을 읽지 못했습니다. 출력 미리보기: %s" % preview_text(output_text)}
+
+        context = payload.get("context", {})
+        if not isinstance(context, dict):
+            context = {}
+        hand_name = str(context.get("hand_name", "")).strip()
+        hand_cards_text = str(context.get("hand_cards", "")).strip()
+        reason_text = normalize_reason_text(
+            str(draw_payload.get("reason", "")).strip(),
+            "현재 손패 기준으로 교체 카드를 정했다.",
+        )
+        card_anchors = [hand_name] if hand_name else []
+        card_anchors.extend([card.strip() for card in hand_cards_text.split(",") if card.strip()])
+        if card_anchors and not any(anchor in reason_text for anchor in card_anchors):
+            trace_runtime(
+                "draw.reason.regrounded",
+                hand_name=hand_name,
+                preview=preview_text(reason_text),
+            )
+            reason_text = "현재 손패 %s를 보고 교체 카드를 골랐다." % (hand_name or hand_cards_text or "상태")
 
         discard_indexes = []
         for index in draw_payload.get("discard_indexes", []):
@@ -745,10 +847,7 @@ class QwenRuntime:
         return {
             "status": "ok",
             "discard_indexes": discard_indexes[: int(payload.get("max_discards", 3))],
-            "reason": normalize_reason_text(
-                str(draw_payload.get("reason", "")).strip(),
-                "현재 손패 기준으로 교체 카드를 정했다.",
-            ),
+            "reason": reason_text,
         }
 
     def handle_dialogue(self, payload):
@@ -764,16 +863,24 @@ class QwenRuntime:
 
         output_text, _ = self.run_agent(
             self.dialogue_agent,
-            payload["prompt"],
+            payload.get("prompt", ""),
             payload.get("context", {}),
             {
-                "max_new_tokens": payload.get("max_new_tokens", 64),
-                "temperature": 0.35,
-                "top_p": 0.85,
+                "max_new_tokens": payload.get("max_new_tokens", 80),
+                "temperature": 0.3,
+                "top_p": 0.8,
             },
         )
         clean_text = normalize_dialogue_text(output_text)
         if not clean_text or looks_like_meta_response(clean_text):
+            context = payload.get("context", {})
+            if not isinstance(context, dict):
+                context = {}
+            trace_runtime(
+                "dialogue.invalid_output",
+                preview=preview_text(output_text),
+                event_name=context.get("event_name", ""),
+            )
             return {"status": "error", "reason": "Qwen-Agent가 유효한 심리전 대사를 만들지 못했습니다. 출력 미리보기: %s" % preview_text(output_text)}
 
         return {"status": "ok", "text": clean_text, "reason": "LLM 대사 생성 성공"}
@@ -801,13 +908,17 @@ class QwenRuntime:
         )
         feedback_payload = extract_json_payload(output_text)
         if not isinstance(feedback_payload, dict):
+            trace_runtime(
+                "policy.invalid_json",
+                preview=preview_text(output_text),
+            )
             return {"status": "error", "reason": "Qwen-Agent 응답에서 라운드 회고 JSON을 찾지 못했습니다. 출력 미리보기: %s" % preview_text(output_text)}
 
         return {
             "status": "ok",
-            "short_term": str(feedback_payload.get("short_term", "")).strip(),
-            "long_term": str(feedback_payload.get("long_term", "")).strip(),
-            "strategy_focus": str(feedback_payload.get("strategy_focus", "")).strip(),
+            "short_term": str(feedback_payload.get("short_term", "") or "").strip(),
+            "long_term": str(feedback_payload.get("long_term", "") or "").strip(),
+            "strategy_focus": str(feedback_payload.get("strategy_focus", "") or "").strip(),
         }
 
     def handle_chat(self, payload):
@@ -841,7 +952,22 @@ class QwenRuntime:
             작업 결과 사전이다.
         """
 
+        if not isinstance(payload, dict):
+            trace_runtime("task.invalid_payload", payload_type=type(payload).__name__)
+            return {
+                "status": "error",
+                "reason": "LLM 요청 payload가 JSON 객체가 아닙니다.",
+                "payload_type": type(payload).__name__,
+            }
+
         mode = payload.get("mode")
+        if not isinstance(mode, str) or not mode.strip():
+            trace_runtime("task.missing_mode", payload_keys=sorted(payload.keys()))
+            return {
+                "status": "error",
+                "reason": "LLM 요청에 mode가 없습니다.",
+                "payload_keys": sorted(payload.keys()),
+            }
         if mode == "action":
             return self.handle_action(payload)
         if mode == "draw":
@@ -890,6 +1016,16 @@ def serve_ipc(runtime):
             continue
         try:
             payload = json.loads(raw)
+            if not isinstance(payload, dict):
+                trace_runtime("ipc.invalid_payload", payload_type=type(payload).__name__, preview=preview_text(raw))
+                write_ipc_payload(
+                    {
+                        "status": "error",
+                        "reason": "IPC 요청은 JSON 객체여야 합니다.",
+                        "payload_type": type(payload).__name__,
+                    }
+                )
+                continue
             mode = payload.get("mode")
             if mode == "__health__":
                 write_ipc_payload(
@@ -905,7 +1041,11 @@ def serve_ipc(runtime):
                 write_ipc_payload({"status": "ok", "reason": "shutdown"})
                 return
             write_ipc_payload(runtime.run_task(payload))
+        except json.JSONDecodeError as exc:
+            trace_runtime("ipc.json_error", error=str(exc), preview=preview_text(raw))
+            write_ipc_payload({"status": "error", "error": error_reason(exc)})
         except Exception as exc:
+            trace_runtime("ipc.exception", error=error_reason(exc), traceback=traceback.format_exc(limit=5))
             write_ipc_payload({"status": "error", "error": error_reason(exc)})
 
 

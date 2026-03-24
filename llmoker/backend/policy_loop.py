@@ -1,5 +1,32 @@
 """라운드 종료 결과를 기억 저장용 전략 피드백으로 바꾼다."""
 
+import sys
+import traceback
+
+
+def _trace_policy(stage, **fields):
+    """
+    정책 회고 분기와 오류 원인을 stderr에 짧게 남긴다.
+
+    Args:
+        stage: 현재 추적 단계 이름이다.
+        **fields: 함께 남길 부가 정보다.
+    """
+
+    parts = ["[LLMoker][TRACE][POLICY] %s" % stage]
+    for key, value in fields.items():
+        if value is None:
+            continue
+        if isinstance(value, (list, tuple, set)):
+            value = ", ".join(str(item) for item in value)
+        else:
+            value = str(value)
+        value = " ".join(value.split())
+        if value:
+            parts.append("%s=%s" % (key, value))
+    sys.stderr.write(" / ".join(parts) + "\n")
+    sys.stderr.flush()
+
 
 class PolicyLoop:
     """
@@ -60,21 +87,68 @@ class PolicyLoop:
             저장 가능한 정책 피드백 사전이다.
         """
 
-        if bot_mode != "llm_npc":
-            return self._build_rule_feedback(round_summary)
-
-        feedback = self.llm_agent.generate_policy_feedback(
-            round_summary=round_summary,
-            public_log=public_log,
-            bot_name=round_summary["bot_name"],
-        )
-        if feedback.get("status") != "ok":
+        if not isinstance(round_summary, dict):
+            _trace_policy("invalid_round_summary", round_summary_type=type(round_summary).__name__)
             return {
-                "short_term": "정책 피드백 생성 실패: %s" % feedback.get("reason", "알 수 없는 오류"),
+                "short_term": "정책 피드백 생성 실패: 라운드 요약이 올바르지 않습니다.",
                 "long_term": "정책 피드백 생성이 실패해 이번 라운드 회고를 저장하지 못했다.",
-                "strategy_focus": "LLM 정책 피드백 오류 원인 확인",
+                "strategy_focus": "라운드 요약 구조 점검",
                 "status": "error",
             }
+
+        if bot_mode != "llm_npc":
+            _trace_policy("rule_feedback", bot_mode=bot_mode, hand_no=round_summary.get("hand_no"))
+            return self._build_rule_feedback(round_summary)
+
+        public_log = list(public_log or [])
+        _trace_policy(
+            "llm_feedback_start",
+            hand_no=round_summary.get("hand_no"),
+            bot_name=round_summary.get("bot_name"),
+            public_log_count=len(public_log),
+        )
+        try:
+            feedback = self.llm_agent.generate_policy_feedback(
+                round_summary=round_summary,
+                public_log=public_log,
+                bot_name=round_summary["bot_name"],
+            )
+        except Exception as exc:
+            _trace_policy(
+                "llm_feedback_exception",
+                hand_no=round_summary.get("hand_no"),
+                error=str(exc).strip() or "알 수 없는 오류",
+                traceback=traceback.format_exc(limit=5).strip(),
+            )
+            fallback = self._build_rule_feedback(round_summary)
+            fallback["status"] = "ok"
+            fallback["source"] = "rule_fallback"
+            fallback["llm_error"] = str(exc).strip() or "알 수 없는 오류"
+            return fallback
+
+        if not isinstance(feedback, dict):
+            _trace_policy(
+                "llm_feedback_invalid_type",
+                hand_no=round_summary.get("hand_no"),
+                feedback_type=type(feedback).__name__,
+            )
+            fallback = self._build_rule_feedback(round_summary)
+            fallback["status"] = "ok"
+            fallback["source"] = "rule_fallback"
+            fallback["llm_error"] = "회고 응답 형식이 올바르지 않습니다."
+            return fallback
+        if feedback.get("status") != "ok":
+            reason = str(feedback.get("reason", "알 수 없는 오류")).strip() or "알 수 없는 오류"
+            _trace_policy(
+                "llm_feedback_rejected",
+                hand_no=round_summary.get("hand_no"),
+                reason=reason,
+            )
+            fallback = self._build_rule_feedback(round_summary)
+            fallback["status"] = "ok"
+            fallback["source"] = "rule_fallback"
+            fallback["llm_error"] = reason
+            return fallback
         return feedback
 
     def persist_feedback(self, round_summary, public_log, bot_mode):
@@ -91,6 +165,15 @@ class PolicyLoop:
         """
 
         feedback = self.build_feedback(round_summary, public_log, bot_mode)
+        if not isinstance(feedback, dict):
+            _trace_policy("persist_invalid_feedback", hand_no=round_summary.get("hand_no"), feedback_type=type(feedback).__name__)
+            return {
+                "short_term": "정책 피드백 생성 실패: 회고 결과 형식이 올바르지 않습니다.",
+                "long_term": "정책 피드백 생성이 실패해 이번 라운드 회고를 저장하지 못했다.",
+                "strategy_focus": "회고 결과 형식 점검",
+                "status": "error",
+            }
+
         bot_name = round_summary["bot_name"]
         if feedback.get("status") == "error":
             return feedback

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from backend.llm.prompts import (
     build_action_prompt,
+    build_dialogue_state_text,
     build_dialogue_prompt,
     build_draw_prompt,
     build_policy_feedback_prompt,
@@ -64,8 +65,19 @@ def build_decision_context(match, legal_actions):
     for line in match.get_public_log_lines():
         recent_log_lines.append(" ".join(str(line or "").split()))
 
+    hand_cards = match.format_bot_hand_for_prompt()
+    hand_cards_text = ", ".join(hand_cards) if hand_cards else "아직 배분 전"
+
     return {
         "public_state": build_public_state_text(match, legal_actions),
+        "phase_name": match.phase_name_ko(),
+        "hand_name": match.get_bot_hand_name(),
+        "hand_cards": hand_cards_text,
+        "pot": "%d칩" % match.pot,
+        "current_bet": "%d칩" % match.current_bet,
+        "to_call": "%d칩" % match.get_bot_amount_to_call(),
+        "bot_stack": "%d칩" % match.bot.stack,
+        "player_stack": "%d칩" % match.player.stack,
         "recent_feedback": [],
         "long_term_memory": [],
         "recent_log": recent_log_lines,
@@ -85,10 +97,28 @@ def build_action_task(match, legal_actions):
         행동 선택용 `PokerAgentTask`다.
     """
 
+    context = build_decision_context(match, legal_actions)
+    prompt = "\n".join(
+        [
+            build_action_prompt(legal_actions),
+            "공개 사실:",
+            context["public_state"],
+            "최근 공개 로그:",
+            "\n".join(context["recent_log"]) if context["recent_log"] else "(없음)",
+            "현재 손패: %s" % context["hand_cards"],
+            "현재 족보: %s" % context["hand_name"],
+            "현재 팟: %s / 현재 베팅액: %s / 콜 금액: %s" % (
+                context["pot"],
+                context["current_bet"],
+                context["to_call"],
+            ),
+        ]
+    )
+
     return PokerAgentTask(
         mode="action",
-        prompt=build_action_prompt(legal_actions),
-        context=build_decision_context(match, legal_actions),
+        prompt=prompt,
+        context=context,
         metadata={
             "legal_actions": legal_actions,
             "max_new_tokens": 64,
@@ -107,10 +137,23 @@ def build_draw_task(match, max_discards):
         드로우 판단용 `PokerAgentTask`다.
     """
 
+    context = build_decision_context(match, [])
+    prompt = "\n".join(
+        [
+            build_draw_prompt(max_discards),
+            "공개 사실:",
+            context["public_state"],
+            "최근 공개 로그:",
+            "\n".join(context["recent_log"]) if context["recent_log"] else "(없음)",
+            "현재 손패: %s" % context["hand_cards"],
+            "현재 족보: %s" % context["hand_name"],
+        ]
+    )
+
     return PokerAgentTask(
         mode="draw",
-        prompt=build_draw_prompt(max_discards),
-        context=build_decision_context(match, []),
+        prompt=prompt,
+        context=context,
         metadata={
             "max_discards": max_discards,
             "max_new_tokens": 64,
@@ -118,7 +161,7 @@ def build_draw_task(match, max_discards):
     )
 
 
-def build_dialogue_task(match, event_name, result_summary, recent_feedback, long_term_memory):
+def build_dialogue_task(match, event_name, result_summary, recent_feedback, long_term_memory, round_summary=None):
     """
     심리전 대사를 생성하게 할 작업을 만든다.
 
@@ -134,31 +177,54 @@ def build_dialogue_task(match, event_name, result_summary, recent_feedback, long
     """
 
     recent_public_log = match.get_public_log_lines()
-
     recent_log_lines = []
     for line in recent_public_log:
         recent_log_lines.append(" ".join(str(line or "").split()))
+    public_state_text = build_dialogue_state_text(match)
+    emotion_hint = None
+    active_round_summary = round_summary if isinstance(round_summary, dict) else getattr(match, "round_summary", None)
+    if event_name in ("round_end", "match_end") and isinstance(active_round_summary, dict):
+        winner = active_round_summary.get("winner")
+        if winner == match.bot.name:
+            emotion_hint = "방금 이겼다. 짧게 기쁨이나 우쭐함을 드러내되 상대에게 바로 말한다."
+        elif winner == match.player.name:
+            emotion_hint = "방금 졌다. 짧게 분함이나 짜증을 드러내되 상대에게 바로 말한다."
+        elif winner == "무승부":
+            emotion_hint = "무승부라 담담하지만 아쉬움이 남는다."
+    elif event_name == "betting":
+        emotion_hint = "상대가 방금 고른 행동을 두고 바로 압박하거나 비꼰다."
+    elif event_name == "draw":
+        emotion_hint = "드로우 타이밍에서 상대를 흔드는 말을 한다."
+
+    prompt = "\n".join(
+        [
+            build_dialogue_prompt(
+                event_name=event_name,
+                recent_log=recent_log_lines,
+                result_summary=result_summary,
+                player_name=match.player.name,
+                bot_name=match.bot.name,
+                emotion_hint=emotion_hint,
+            ),
+            "설명하지 말고 바로 그 한마디만 말한다.",
+        ]
+    )
 
     return PokerAgentTask(
         mode="dialogue",
-        prompt=build_dialogue_prompt(
-            event_name=event_name,
-            recent_log=recent_public_log,
-            result_summary=result_summary,
-            player_name=match.player.name,
-            bot_name=match.bot.name,
-        ),
+        prompt=prompt,
         context={
-            "public_state": "",
-            "recent_feedback": [],
-            "long_term_memory": [],
+            "public_state": public_state_text,
+            "recent_feedback": recent_feedback,
+            "long_term_memory": long_term_memory,
             "recent_log": recent_log_lines,
             "player_name": match.player.name,
             "bot_name": match.bot.name,
+            "round_summary": active_round_summary or {},
         },
         metadata={
             "event_name": event_name,
-            "max_new_tokens": 110,
+            "max_new_tokens": 80,
         },
     )
 
@@ -192,9 +258,33 @@ def build_policy_task(round_summary, public_log, bot_name, recent_feedback, long
     for line in public_log or []:
         recent_log_lines.append(" ".join(str(line or "").split()))
 
+    summary_lines = [
+        "라운드 번호: %s" % round_summary.get("hand_no"),
+        "승자: %s" % round_summary.get("winner"),
+        "내 족보: %s" % round_summary.get("bot_hand_name"),
+        "상대 족보: %s" % round_summary.get("player_hand_name"),
+        "팟: %s칩" % round_summary.get("pot"),
+        "내 스택: %s칩" % round_summary.get("bot_stack"),
+        "상대 스택: %s칩" % round_summary.get("player_stack"),
+    ]
+
+    prompt = "\n".join(
+        [
+            build_policy_feedback_prompt(),
+            "라운드 요약:",
+            "\n".join(summary_lines),
+            "최근 공개 로그:",
+            "\n".join(recent_log_lines) if recent_log_lines else "(없음)",
+            "최근 단기 기억:",
+            "\n".join(recent_feedback_texts) if recent_feedback_texts else "(없음)",
+            "장기 기억:",
+            "\n".join(long_term_memory_texts) if long_term_memory_texts else "(없음)",
+        ]
+    )
+
     return PokerAgentTask(
         mode="policy",
-        prompt=build_policy_feedback_prompt(),
+        prompt=prompt,
         context={
             "round_summary": round_summary,
             "recent_feedback": recent_feedback_texts,

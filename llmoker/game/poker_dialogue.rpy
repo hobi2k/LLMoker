@@ -207,7 +207,7 @@ init python:
 
         speaker_map = {
             "sb": store.sb,
-            "sys": store.sys,
+            "sys": store.system_speaker,
             "narrator": None,
         }
 

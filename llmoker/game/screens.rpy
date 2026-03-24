@@ -17,14 +17,26 @@ transform llmoker_main_menu_video_fit:
     ysize llmoker_gui_height
 
 transform llmoker_neon_breathe:
-    alpha 0.82
-    linear 1.2 alpha 1.0
-    linear 1.2 alpha 0.82
+    alpha 0.9
+    linear 1.25 alpha 1.0
+    linear 1.25 alpha 0.9
     repeat
 
 transform llmoker_menu_fade_in:
     alpha 0.0
     linear 0.28 alpha 1.0
+
+transform llmoker_menu_panel_slide_in:
+    alpha 0.0
+    xoffset -28
+    pause 0.08
+    easeout 0.32 alpha 1.0 xoffset 0
+
+transform llmoker_menu_title_glow_in:
+    alpha 0.0
+    yoffset 18
+    pause 0.18
+    easeout 0.34 alpha 1.0 yoffset 0
 
 
 ################################################################################
@@ -321,7 +333,7 @@ screen navigation():
         xpos gui.navigation_xpos
         yalign 0.5
 
-        spacing gui.navigation_spacing
+        spacing gui_scale(10)
 
         if main_menu:
 
@@ -365,18 +377,18 @@ style navigation_button_text is gui_button_text
 style navigation_button:
     size_group "navigation"
     properties gui.button_properties("navigation_button")
-    xminimum gui_scale(350)
-    left_padding gui_scale(34)
-    right_padding gui_scale(28)
-    top_padding gui_scale(18)
-    bottom_padding gui_scale(18)
-    background "#08121de6"
-    hover_background "#17293fe0"
+    xminimum gui_scale(286)
+    left_padding gui_scale(22)
+    right_padding gui_scale(18)
+    top_padding gui_scale(11)
+    bottom_padding gui_scale(11)
+    background "#08131ed8"
+    hover_background "#18304ae8"
 
 style navigation_button_text:
     properties gui.text_properties("navigation_button")
     font "fonts/malgunbd.ttf"
-    size gui_scale(35)
+    size gui_scale(24)
     color "#e7f3ff"
     hover_color "#ffffff"
     outlines [(1, "#071019", 0, 0)]
@@ -400,19 +412,23 @@ screen main_menu():
     ## This empty frame darkens the main menu.
     frame:
         style "main_menu_frame"
-        at llmoker_menu_fade_in
+        at llmoker_menu_panel_slide_in
+
+    frame:
+        style "main_menu_brand_plate"
+        at llmoker_menu_title_glow_in
 
     ## The use statement includes another screen inside this one. The actual
     ## contents of the main menu are in the navigation screen.
     fixed:
-        at llmoker_menu_fade_in
+        at llmoker_menu_panel_slide_in
         use navigation
 
     if gui.show_name:
 
         fixed:
             style "main_menu_brand_panel"
-            at llmoker_menu_fade_in
+            at llmoker_menu_title_glow_in
 
             text "[config.name!t]":
                 style "main_menu_title_glow"
@@ -428,32 +444,40 @@ style main_menu_title is main_menu_text
 style main_menu_title_glow is main_menu_text
 style main_menu_version is main_menu_text
 style main_menu_brand_panel is empty
+style main_menu_brand_plate is empty
 
 style main_menu_frame:
-    xsize gui_scale(390)
+    xsize gui_scale(300)
     yfill True
-    background "#040b149e"
+    background "#04101ab6"
 
 style main_menu_brand_panel:
-    xpos gui_scale(260)
-    ypos gui_scale(24)
-    xmaximum gui_scale(430)
-    ymaximum gui_scale(182)
+    xpos gui_scale(402)
+    ypos gui_scale(36)
+    xmaximum gui_scale(280)
+    ymaximum gui_scale(92)
+
+style main_menu_brand_plate:
+    xpos gui_scale(374)
+    ypos gui_scale(20)
+    xsize gui_scale(330)
+    ysize gui_scale(96)
+    background "#1808185a"
 
 style main_menu_text:
     properties gui.text_properties("main_menu", accent=True)
 
 style main_menu_title:
     font "fonts/malgunbd.ttf"
-    size gui_scale(82)
-    color "#fff7fb"
-    outlines [(2, "#2c0918", 0, 0), (6, "#ff67b463", 0, 0)]
+    size gui_scale(50)
+    color "#fff9fd"
+    outlines [(1, "#2c0918", 0, 0), (2, "#ff67b422", 0, 0), (4, "#ff3fa914", 0, 0)]
 
 style main_menu_title_glow:
     font "fonts/malgunbd.ttf"
-    size gui_scale(82)
-    color "#ff70c9"
-    outlines [(8, "#ff4bb6c8", 0, 0), (14, "#ff4bb68f", 0, 0), (20, "#ff4bb64e", 0, 0)]
+    size gui_scale(50)
+    color "#ff76cf"
+    outlines [(2, "#ff4bb648", 0, 0), (4, "#ff4bb626", 0, 0), (7, "#ff4bb612", 0, 0)]
 
 
 ## Game Menu screen ############################################################
@@ -474,66 +498,67 @@ screen game_menu(title, scroll=None, yinitial=0.0, spacing=0):
     else:
         add gui.game_menu_background
 
+    key "K_ESCAPE" action (ShowMenu("main_menu") if main_menu else Return())
+    key "game_menu" action (ShowMenu("main_menu") if main_menu else Return())
+
     frame:
-        style "game_menu_outer_frame"
+        style "game_menu_modal_frame"
+        at llmoker_menu_fade_in
 
-        hbox:
+        vbox:
+            spacing gui_scale(16)
 
-            ## Reserve space for the navigation section.
-            frame:
-                style "game_menu_navigation_frame"
+            hbox:
+                xfill True
+                spacing gui_scale(14)
 
-            frame:
-                style "game_menu_content_frame"
+                text title:
+                    style "game_menu_modal_title"
 
-                if scroll == "viewport":
+                null width gui_scale(12)
 
-                    viewport:
-                        yinitial yinitial
-                        scrollbars "vertical"
-                        mousewheel True
-                        draggable True
-                        pagekeys True
+                textbutton "돌아가기":
+                    style "game_menu_modal_close_button"
+                    action (ShowMenu("main_menu") if main_menu else Return())
 
-                        side_yfill True
+            add Solid("#ff67c53f") xsize gui_scale(240) ysize gui_scale(2)
 
-                        vbox:
-                            spacing spacing
+            if scroll == "viewport":
 
-                            transclude
+                viewport:
+                    yinitial yinitial
+                    scrollbars "vertical"
+                    mousewheel True
+                    draggable True
+                    pagekeys True
 
-                elif scroll == "vpgrid":
+                    side_yfill True
 
-                    vpgrid:
-                        cols 1
-                        yinitial yinitial
-
-                        scrollbars "vertical"
-                        mousewheel True
-                        draggable True
-                        pagekeys True
-
-                        side_yfill True
-
+                    vbox:
                         spacing spacing
 
                         transclude
 
-                else:
+            elif scroll == "vpgrid":
+
+                vpgrid:
+                    cols 1
+                    yinitial yinitial
+
+                    scrollbars "vertical"
+                    mousewheel True
+                    draggable True
+                    pagekeys True
+
+                    side_yfill True
+
+                    spacing spacing
 
                     transclude
 
-    use navigation
+            else:
 
-    textbutton _("Return"):
-        style "return_button"
-
-        action Return()
-
-    label title
-
-    if main_menu:
-        key "game_menu" action ShowMenu("main_menu")
+                transclude
 
 
 style game_menu_outer_frame is empty
@@ -549,20 +574,41 @@ style game_menu_label_text is gui_label_text
 style return_button is navigation_button
 style return_button_text is navigation_button_text
 
-style game_menu_outer_frame:
-    bottom_padding gui_scale(45)
-    top_padding gui_scale(180)
+style game_menu_modal_frame is empty
+style game_menu_modal_title is gui_label_text
+style game_menu_modal_close_button is navigation_button
+style game_menu_modal_close_button_text is navigation_button_text
 
-    background "gui/overlay/game_menu.png"
+style game_menu_modal_frame:
+    xalign 0.5
+    yalign 0.5
+    xmaximum gui_scale(860)
+    ymaximum gui_scale(520)
+    padding (gui_scale(28), gui_scale(22))
+    background "#07111bef"
 
-style game_menu_navigation_frame:
-    xsize gui_scale(420)
-    yfill True
+style game_menu_modal_title:
+    font "fonts/malgunbd.ttf"
+    size gui_scale(30)
+    color "#f5f8ff"
+    outlines [(1, "#071019", 0, 0)]
 
-style game_menu_content_frame:
-    left_margin gui_scale(60)
-    right_margin gui_scale(30)
-    top_margin gui_scale(15)
+style game_menu_modal_close_button:
+    xalign 1.0
+    xminimum gui_scale(138)
+    left_padding gui_scale(16)
+    right_padding gui_scale(16)
+    top_padding gui_scale(10)
+    bottom_padding gui_scale(10)
+    background "#0f1727e8"
+    hover_background "#1f2d42f0"
+
+style game_menu_modal_close_button_text:
+    font "fonts/malgunbd.ttf"
+    size gui_scale(22)
+    color "#f0f6ff"
+    hover_color "#ffffff"
+    outlines [(1, "#071019", 0, 0)]
 
 style game_menu_viewport:
     xsize gui_scale(1380)
@@ -571,14 +617,14 @@ style game_menu_vscrollbar:
     unscrollable gui.unscrollable
 
 style game_menu_side:
-    spacing gui_scale(15)
+    spacing gui_scale(12)
 
 style game_menu_label:
     xpos gui_scale(75)
-    ysize gui_scale(180)
+    ysize gui_scale(150)
 
 style game_menu_label_text:
-    size gui.title_text_size
+    size gui_scale(40)
     color gui.accent_color
     yalign 0.5
 
@@ -607,15 +653,10 @@ screen about():
         style_prefix "about"
 
         vbox:
-
             label "[config.name!t]"
             text "버전 [config.version!t]\n"
-
-            ## gui.about is usually set in options.rpy.
-            if gui.about:
-                text "[gui.about!t]\n"
-
-            text "{a=https://www.renpy.org/}Ren'Py{/a} [renpy.version_only] 기반으로 제작되었습니다.\n\n[renpy.license!t]"
+            text "카지노 테이블, 로컬 LLM NPC, 저장/회고 구조를 결합한 포커 게임입니다.\n"
+            text "대사, 판단, 기억, 연출은 모두 게임 내부 구조로 연결됩니다."
 
 
 style about_label is gui_label
@@ -784,86 +825,53 @@ screen preferences():
     use game_menu("환경 설정", scroll="viewport"):
 
         vbox:
+            spacing 18
 
-            hbox:
-                box_wrap True
+            text "이 화면은 LLMoker 플레이 감각을 조정하는 전용 설정만 제공한다." size gui_scale(20) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(800)
 
-                if renpy.variant("pc") or renpy.variant("web"):
+            vbox:
+                spacing 10
+                text "플레이" size gui_scale(24) color "#ffe8a3" font "fonts/malgunbd.ttf"
 
-                    vbox:
-                        style_prefix "radio"
-                        label "화면 모드"
-                        textbutton "창 모드" action Preference("display", "window")
-                        textbutton "전체 화면" action Preference("display", "fullscreen")
+                hbox:
+                    spacing 18
+                    text "텍스트 속도" size gui_scale(19) color "#f3f3f3" font "fonts/malgunbd.ttf" xsize gui_scale(180)
+                    bar value Preference("text speed") xsize gui_scale(420)
 
-                vbox:
-                    style_prefix "check"
-                    label "건너뛰기"
-                    textbutton "읽지 않은 텍스트 포함" action Preference("skip", "toggle")
-                    textbutton "선택지 이후에도 계속" action Preference("after choices", "toggle")
-                    textbutton "화면 전환 포함" action InvertSelected(Preference("transitions", "toggle"))
+                hbox:
+                    spacing 18
+                    text "자동 진행 지연" size gui_scale(19) color "#f3f3f3" font "fonts/malgunbd.ttf" xsize gui_scale(180)
+                    bar value Preference("auto-forward time") xsize gui_scale(420)
 
-                if main_menu:
-                    vbox:
-                        style_prefix "radio"
-                        label "상대 AI"
-                        text "현재 선택: [store.poker_bot_mode == 'llm_npc' and 'LLM NPC' or '스크립트봇']"
-                        textbutton "LLM NPC 사용" action Function(apply_poker_bot_mode, "llm_npc")
-                        textbutton "스크립트봇 사용" action Function(apply_poker_bot_mode, "script_bot")
+                hbox:
+                    spacing 12
+                    textbutton "자동 진행 켜기/끄기" action Preference("auto-forward", "toggle")
+                    textbutton "퀵 메뉴 표시/숨김" action SetVariable("quick_menu", not quick_menu)
 
-                ## Additional vboxes of type "radio_pref" or "check_pref" can be
-                ## added here, to add additional creator-defined preferences.
+            vbox:
+                spacing 10
+                text "오디오" size gui_scale(24) color "#ffe8a3" font "fonts/malgunbd.ttf"
 
-            null height (4 * gui.pref_spacing)
+                hbox:
+                    spacing 18
+                    text "배경 음악" size gui_scale(19) color "#f3f3f3" font "fonts/malgunbd.ttf" xsize gui_scale(180)
+                    bar value Preference("music volume") xsize gui_scale(420)
 
-            hbox:
-                style_prefix "slider"
-                box_wrap True
+                hbox:
+                    spacing 18
+                    text "효과음" size gui_scale(19) color "#f3f3f3" font "fonts/malgunbd.ttf" xsize gui_scale(180)
+                    bar value Preference("sound volume") xsize gui_scale(420)
 
-                vbox:
+            vbox:
+                spacing 10
+                text "상대 AI" size gui_scale(24) color "#ffe8a3" font "fonts/malgunbd.ttf"
+                text "현재 선택: [store.poker_bot_mode == 'llm_npc' and 'LLM NPC' or '스크립트봇']" size gui_scale(19) color "#f3f3f3" font "fonts/malgun.ttf"
+                hbox:
+                    spacing 12
+                    textbutton "LLM NPC 사용" action Function(apply_poker_bot_mode, "llm_npc")
+                    textbutton "스크립트봇 사용" action Function(apply_poker_bot_mode, "script_bot")
 
-                    label "텍스트 속도"
-
-                    bar value Preference("text speed")
-
-                    label "자동 진행 대기 시간"
-
-                    bar value Preference("auto-forward time")
-
-                vbox:
-
-                    if config.has_music:
-                        label "배경음 볼륨"
-
-                        hbox:
-                            bar value Preference("music volume")
-
-                    if config.has_sound:
-
-                        label "효과음 볼륨"
-
-                        hbox:
-                            bar value Preference("sound volume")
-
-                            if config.sample_sound:
-                                textbutton "재생" action Play("sound", config.sample_sound)
-
-
-                    if config.has_voice:
-                        label "음성 볼륨"
-
-                        hbox:
-                            bar value Preference("voice volume")
-
-                            if config.sample_voice:
-                                textbutton "재생" action Play("voice", config.sample_voice)
-
-                    if config.has_music or config.has_sound or config.has_voice:
-                        null height gui.pref_spacing
-
-                        textbutton "전체 음소거":
-                            action Preference("all mute", "toggle")
-                            style "mute_all_button"
+            text "게임 흐름, 대사 반응, 저장 구조에 영향을 주는 항목만 이 화면에서 다룬다." size gui_scale(18) color "#c7d8ff" font "fonts/malgun.ttf" xmaximum gui_scale(800)
 
 
 style pref_label is gui_label
@@ -900,7 +908,7 @@ style pref_label_text:
     yalign 1.0
 
 style pref_vbox:
-    xsize 338
+    xsize 760
 
 style radio_vbox:
     spacing gui.pref_button_spacing
@@ -934,7 +942,7 @@ style slider_button_text:
     properties gui.text_properties("slider_button")
 
 style slider_vbox:
-    xsize 675
+    xsize 760
 
 
 ## History screen ##############################################################
@@ -1037,132 +1045,32 @@ screen help():
 
     tag menu
 
-    default device = "keyboard"
-
     use game_menu("도움말", scroll="viewport"):
 
         style_prefix "help"
 
         vbox:
-            spacing 23
+            spacing 18
 
-            hbox:
+            text "LLMoker 기본 조작" size gui_scale(30) color "#ffffff" font "fonts/malgunbd.ttf"
 
-                textbutton "키보드" action SetScreenVariable("device", "keyboard")
-                textbutton "마우스" action SetScreenVariable("device", "mouse")
+            vbox:
+                spacing 8
+                text "테이블 진행" size gui_scale(24) color "#ffe8a3" font "fonts/malgunbd.ttf"
+                text "Enter, Space, 마우스 클릭으로 대사를 넘긴다." size gui_scale(19) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(760)
+                text "메인 메뉴에서는 왼쪽 내비게이션, 게임 중에는 하단 도크를 사용한다." size gui_scale(19) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(760)
 
-                if GamepadExists():
-                    textbutton "게임패드" action SetScreenVariable("device", "gamepad")
+            vbox:
+                spacing 8
+                text "행동 선택" size gui_scale(24) color "#ffe8a3" font "fonts/malgunbd.ttf"
+                text "베팅 단계에서는 체크, 베팅, 콜, 레이즈, 폴드를 선택한다." size gui_scale(19) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(760)
+                text "드로우 단계에서는 교체할 카드를 누른 뒤 교체 확정을 누른다." size gui_scale(19) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(760)
 
-            if device == "keyboard":
-                use keyboard_help
-            elif device == "mouse":
-                use mouse_help
-            elif device == "gamepad":
-                use gamepad_help
-
-
-screen keyboard_help():
-
-    hbox:
-        label "Enter"
-        text "대사를 진행하고 인터페이스를 선택합니다."
-
-    hbox:
-        label "Space"
-        text "선택지를 누르지 않고 대사만 진행합니다."
-
-    hbox:
-        label "방향키"
-        text "인터페이스를 이동합니다."
-
-    hbox:
-        label "Escape"
-        text "게임 메뉴를 엽니다."
-
-    hbox:
-        label "Ctrl"
-        text "누르고 있는 동안 대사를 건너뜁니다."
-
-    hbox:
-        label "Tab"
-        text "대사 건너뛰기를 켜거나 끕니다."
-
-    hbox:
-        label "Page Up"
-        text "이전 대사로 되돌아갑니다."
-
-    hbox:
-        label "Page Down"
-        text "다음 대사로 앞으로 이동합니다."
-
-    hbox:
-        label "H"
-        text "사용자 인터페이스를 숨깁니다."
-
-    hbox:
-        label "S"
-        text "스크린샷을 저장합니다."
-
-    hbox:
-        label "V"
-        text "{a=https://www.renpy.org/l/voicing}셀프 보이스{/a} 기능을 켜거나 끕니다."
-
-    hbox:
-        label "Shift+A"
-        text "접근성 메뉴를 엽니다."
-
-
-screen mouse_help():
-
-    hbox:
-        label "왼쪽 클릭"
-        text "대사를 진행하고 인터페이스를 선택합니다."
-
-    hbox:
-        label "가운데 클릭"
-        text "사용자 인터페이스를 숨깁니다."
-
-    hbox:
-        label "오른쪽 클릭"
-        text "게임 메뉴를 엽니다."
-
-    hbox:
-        label "휠 위로"
-        text "이전 대사로 되돌아갑니다."
-
-    hbox:
-        label "휠 아래로"
-        text "다음 대사로 앞으로 이동합니다."
-
-
-screen gamepad_help():
-
-    hbox:
-        label "오른쪽 트리거\nA/아래 버튼"
-        text "대사를 진행하고 인터페이스를 선택합니다."
-
-    hbox:
-        label "왼쪽 트리거\n왼쪽 숄더"
-        text "이전 대사로 되돌아갑니다."
-
-    hbox:
-        label "오른쪽 숄더"
-        text "다음 대사로 앞으로 이동합니다."
-
-    hbox:
-        label "방향 패드, 스틱"
-        text "인터페이스를 이동합니다."
-
-    hbox:
-        label "시작, 가이드, B/오른쪽 버튼"
-        text "게임 메뉴를 엽니다."
-
-    hbox:
-        label "Y/위 버튼"
-        text "사용자 인터페이스를 숨깁니다."
-
-    textbutton "보정" action GamepadCalibrate()
+            vbox:
+                spacing 8
+                text "화면 전환" size gui_scale(24) color "#ffe8a3" font "fonts/malgunbd.ttf"
+                text "Esc 또는 우측 시스템 도크의 메인 메뉴 버튼으로 게임 메뉴를 연다." size gui_scale(19) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(760)
+                text "로그 보기, 저장, 불러오기, 환경 설정은 시스템 도크에서 연다." size gui_scale(19) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(760)
 
 
 style help_button is gui_button

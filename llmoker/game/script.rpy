@@ -1,21 +1,46 @@
-﻿define n = Character(None, kind=nvl)
+define n = Character(None, kind=nvl)
 define sb = DynamicCharacter("get_poker_match().bot.name")
-define sys = Character("시스템")
+define system_speaker = Character("시스템")
+
 
 label splashscreen:
     $ renpy.music.stop(channel="music")
-    $ renpy.movie_cutscene("gui/logo.webm", stop_music=False)
+    $ begin_llm_npc_prewarm()
+
+    $ renpy.movie_cutscene("gui/logo.webm", delay=None, loops=0, stop_music=False)
+
     scene black
     with Dissolve(0.12)
-    pause 0.12
-    $ renpy.movie_cutscene("gui/intro_with_audio.webm", stop_music=False)
+
+    show expression Text(
+        "이 게임의 모든 자산은 오픈소스 AI 모델로 제작되었습니다.",
+        size=28,
+        font="fonts/malgunbd.ttf",
+        color="#f4f4f4",
+        outlines=[(2, "#000000", 0, 0)],
+        text_align=0.5,
+    ) as splash_notice:
+        xalign 0.5
+        yalign 0.5
+
+    pause 2.2
+    hide splash_notice
+    pause 0.22
+
+    $ renpy.movie_cutscene("gui/intro_with_audio.webm", delay=None, loops=0, stop_music=False)
+
     scene black
-    with Dissolve(0.18)
-    pause 0.18
+    with Dissolve(0.35)
+    pause 0.45
+
+    $ renpy.movie_cutscene("gui/openingcinema.webm", delay=None, loops=0, stop_music=False)
+
     scene llmoker_main_menu_video
-    with Dissolve(0.2)
-    $ renpy.movie_cutscene("gui/openingcinema_playback.webm", stop_music=False)
+    with Dissolve(0.35)
+    pause 0.10
+    $ finish_llm_npc_prewarm()
     return
+
 
 label start:
     $ start_llm_npc()

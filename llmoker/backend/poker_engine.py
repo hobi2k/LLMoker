@@ -685,8 +685,12 @@ class PokerMatch:
 
         if self.phase == "betting1":
             self.phase = "draw"
+            if self.bot_mode == "llm_npc":
+                self._debug_terminal_log("페이즈 전환 / 다음 페이즈: %s / 사유: 첫 번째 베팅 종료" % self.phase_name_ko())
             return ["드로우 단계로 넘어갑니다."]
         elif self.phase == "betting2":
+            if self.bot_mode == "llm_npc":
+                self._debug_terminal_log("페이즈 전환 / 다음 페이즈: 쇼다운 / 사유: 두 번째 베팅 종료")
             return self._resolve_showdown()
         return []
 
@@ -718,6 +722,8 @@ class PokerMatch:
 
         messages = self._apply_betting_action("player", action)
         if not self.round_over:
+            if self.bot_mode == "llm_npc" and self.current_actor == "bot":
+                self._debug_terminal_log("턴 전환 / 다음 차례: %s / 현재 페이즈: %s" % (self.bot.name, self.phase_name_ko()))
             messages.extend(self._run_bot_turns())
         return messages
 
@@ -861,12 +867,6 @@ class PokerMatch:
                     raise RuntimeError("LLM NPC 행동 선택 실패: %s" % self.last_llm_reason)
                 bot_action = llm_choice["action"]
                 self.last_llm_reason = llm_choice.get("reason", "")
-                llm_log = "[LLM NPC] %s 행동 선택: %s / 이유: %s" % (
-                    self.bot.name,
-                    bot_action,
-                    self.last_llm_reason,
-                )
-                self.action_log.append(llm_log)
                 self._debug_terminal_log(
                     "%s 행동 선택 완료 / 선택: %s / 이유: %s / 상태: %s" % (
                         self.bot.name,
@@ -901,6 +901,8 @@ class PokerMatch:
                     bot_action = "fold"
 
             messages.extend(self._apply_betting_action("bot", bot_action))
+            if self.bot_mode == "llm_npc" and not self.round_over and self.current_actor == "player":
+                self._debug_terminal_log("턴 전환 / 다음 차례: 플레이어 / 현재 페이즈: %s" % self.phase_name_ko())
         return messages
 
     def resolve_draw_phase(self, discard_indexes):
@@ -949,13 +951,6 @@ class PokerMatch:
                 )
                 raise RuntimeError("LLM NPC 카드 교체 판단 실패: %s" % draw_choice.get("reason", "LLM 교체 판단 실패"))
             bot_discards = draw_choice["discard_indexes"]
-            llm_draw_log = "[LLM NPC] %s 카드 교체 판단: %s / 이유: %s" % (
-                self.bot.name,
-                bot_discards,
-                draw_choice.get("reason", ""),
-            )
-            self.action_log.append(llm_draw_log)
-            self.public_log.append(llm_draw_log)
             self._debug_terminal_log(
                 "%s 카드 교체 선택 완료 / 버릴 인덱스: %s / 이유: %s / 상태: %s" % (
                     self.bot.name,

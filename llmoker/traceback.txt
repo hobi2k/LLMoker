@@ -1,9 +1,21 @@
 ﻿I'm sorry, but an uncaught exception occurred.
 
 While running game code:
-  File "renpy/common/00action_menu.rpy", line 199, in __call__
-    renpy.jump_out_of_context(self.label)
-JumpOutException: start
+  File "renpy/common/00start.rpy", line 211, in script call
+    call _gl_test
+  File "renpy/common/00gltest.rpy", line 388, in script
+    $ __gl_test()
+  File "renpy/common/00start.rpy", line 211, in script call
+    call _gl_test
+  File "renpy/common/00gltest.rpy", line 388, in script
+    $ __gl_test()
+  File "renpy/common/00gltest.rpy", line 388, in <module>
+    $ __gl_test()
+  File "renpy/common/00gltest.rpy", line 317, in _m1_00gltest__gl_test
+    _gl_performance_test()
+  File "renpy/common/00gltest.rpy", line 340, in _gl_performance_test
+    ui.interact(suppress_underlay=True, suppress_overlay=True)
+error: No available video device
 
 -- Full Traceback ------------------------------------------------------------
 
@@ -16,47 +28,41 @@ Full traceback:
     renpy.execution.run_context(True)
   File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/execution.py", line 955, in run_context
     context.run()
-  File "renpy/common/_layout/screen_main_menu.rpym", line 28, in script
-    python hide:
+  File "renpy/common/00start.rpy", line 211, in script call
+    call _gl_test
+  File "renpy/common/00gltest.rpy", line 388, in script
+    $ __gl_test()
+  File "lib/python3.9/future/utils/__init__.py", line 444, in raise_
+  File "renpy/common/00start.rpy", line 211, in script call
+    call _gl_test
+  File "renpy/common/00gltest.rpy", line 388, in script
+    $ __gl_test()
   File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/ast.py", line 823, in execute
     renpy.python.py_exec_bytecode(self.code.bytecode, self.hide, store=self.store)
   File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/python.py", line 1178, in py_exec_bytecode
     exec(bytecode, globals, locals)
-  File "renpy/common/_layout/screen_main_menu.rpym", line 28, in <module>
-    python hide:
-  File "renpy/common/_layout/screen_main_menu.rpym", line 35, in _execute_python_hide
-    ui.interact()
+  File "renpy/common/00gltest.rpy", line 388, in <module>
+    $ __gl_test()
+  File "renpy/common/00gltest.rpy", line 317, in _m1_00gltest__gl_test
+    _gl_performance_test()
+  File "renpy/common/00gltest.rpy", line 340, in _gl_performance_test
+    ui.interact(suppress_underlay=True, suppress_overlay=True)
   File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/ui.py", line 301, in interact
     rv = renpy.game.interface.interact(roll_forward=roll_forward, **kwargs)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/core.py", line 2165, in interact
-    repeat, rv = self.interact_core(preloads=preloads, trans_pause=trans_pause, pause=pause, pause_start=pause_start, pause_modal=pause_modal, **kwargs) # type: ignore
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/core.py", line 3201, in interact_core
-    rv = root_widget.event(ev, x, y, 0)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/layout.py", line 1202, in event
-    rv = i.event(ev, x - xo, y - yo, cst)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/layout.py", line 1202, in event
-    rv = i.event(ev, x - xo, y - yo, cst)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/layout.py", line 1202, in event
-    rv = i.event(ev, x - xo, y - yo, cst)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/screen.py", line 793, in event
-    rv = self.child.event(ev, x, y, st)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/layout.py", line 1202, in event
-    rv = i.event(ev, x - xo, y - yo, cst)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/layout.py", line 1202, in event
-    rv = i.event(ev, x - xo, y - yo, cst)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/behavior.py", line 1174, in event
-    return handle_click(self.clicked)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/behavior.py", line 1095, in handle_click
-    rv = run(action)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/behavior.py", line 395, in run
-    return action(*args, **kwargs)
-  File "renpy/common/00action_menu.rpy", line 199, in __call__
-    renpy.jump_out_of_context(self.label)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/exports.py", line 2034, in jump_out_of_context
-    raise renpy.game.JumpOutException(label)
-JumpOutException: start
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/core.py", line 2122, in interact
+    self.start()
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/core.py", line 1005, in start
+    self.set_mode()
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/core.py", line 1325, in set_mode
+    if draw.init(virtual_size):
+  File "gl2draw.pyx", line 367, in renpy.gl2.gl2draw.GL2Draw.init
+  File "gl2draw.pyx", line 185, in renpy.gl2.gl2draw.GL2Draw.select_physical_size
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/display/__init__.py", line 59, in get_info
+    pygame.display.init()
+  File "src/pygame_sdl2/display.pyx", line 93, in pygame_sdl2.display.init
+error: No available video device
 
 Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39 x86_64
 Ren'Py 8.2.1.24030407
 LLMoker 1.0
-Tue Mar 24 02:24:01 2026
+Tue Mar 24 19:06:11 2026

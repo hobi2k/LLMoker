@@ -132,7 +132,7 @@ class LocalLLMAgent:
         return {
             "status": "ok",
             "action": action,
-            "reason": str(response.get("reason", "")).strip() or "LLM이 행동을 선택했습니다.",
+            "reason": str(response.get("reason") or "").strip() or "LLM이 행동을 선택했습니다.",
         }
 
     def choose_discards(self, match, max_discards):
@@ -165,7 +165,7 @@ class LocalLLMAgent:
         return {
             "status": "ok",
             "discard_indexes": discard_indexes[:max_discards],
-            "reason": str(response.get("reason", "")).strip() or "LLM이 카드 교체를 판단했습니다.",
+            "reason": str(response.get("reason") or "").strip() or "LLM이 카드 교체를 판단했습니다.",
         }
 
     def generate_dialogue(self, match, event_name, result_summary=None):
@@ -183,7 +183,14 @@ class LocalLLMAgent:
 
         short_term = self.memory_manager.get_recent_feedback(match.bot.name, limit=5, long_term=False)
         long_term = self.memory_manager.get_recent_feedback(match.bot.name, limit=5, long_term=True)
-        task = build_dialogue_task(match, event_name, result_summary, short_term, long_term)
+        task = build_dialogue_task(
+            match,
+            event_name,
+            result_summary,
+            short_term,
+            long_term,
+            round_summary=getattr(match, "round_summary", None),
+        )
         response = self.client.request(task.to_payload())
         if not isinstance(response, dict):
             self.last_status = "LLM 런타임 응답 형식이 올바르지 않습니다."
@@ -194,7 +201,7 @@ class LocalLLMAgent:
             return {"status": "error", "reason": reason}
         self.last_status = "Qwen 런타임 요청 성공"
 
-        text = str(response.get("text", "")).strip()
+        text = str(response.get("text") or "").strip()
         if not text:
             return {"status": "error", "reason": "LLM이 유효한 심리전 대사를 만들지 못했습니다."}
         return {"status": "ok", "text": text, "reason": "LLM 대사 생성 성공"}
@@ -226,7 +233,7 @@ class LocalLLMAgent:
         self.last_status = "Qwen 런타임 요청 성공"
         return {
             "status": "ok",
-            "short_term": str(response.get("short_term", "")).strip(),
-            "long_term": str(response.get("long_term", "")).strip(),
-            "strategy_focus": str(response.get("strategy_focus", "")).strip(),
+            "short_term": str(response.get("short_term") or "").strip(),
+            "long_term": str(response.get("long_term") or "").strip(),
+            "strategy_focus": str(response.get("strategy_focus") or "").strip(),
         }
