@@ -8,6 +8,7 @@ import importlib
 import os
 import subprocess
 import sys
+import ensurepip
 
 
 MODEL_REPO_ID = "Qwen/Qwen3-4B-Instruct-2507"
@@ -62,6 +63,11 @@ def ensure_huggingface_hub() -> None:
         return
     except ModuleNotFoundError:
         pass
+
+    try:
+        importlib.import_module("pip")
+    except ModuleNotFoundError:
+        ensurepip.bootstrap(upgrade=True)
 
     subprocess.check_call(
         [

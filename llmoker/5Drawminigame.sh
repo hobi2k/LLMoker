@@ -47,9 +47,18 @@ fi
 
 LIB="$ROOT/lib/$PYTHON-$RENPY_PLATFORM"
 RUNNER_PYTHON="$ROOT/.venv/bin/python"
+BOOTSTRAP_PYTHON="${LLMOKER_BOOTSTRAP_PYTHON:-python3}"
 
 if ! test -x "$RUNNER_PYTHON"; then
-    RUNNER_PYTHON="python3"
+    if ! command -v "$BOOTSTRAP_PYTHON" >/dev/null 2>&1; then
+        echo "Python 3를 찾을 수 없습니다. LLM 런타임용 Python 3를 설치하거나 LLMOKER_BOOTSTRAP_PYTHON을 지정하세요."
+        exit 1
+    fi
+    "$BOOTSTRAP_PYTHON" -m venv "$ROOT/.venv"
+fi
+
+if ! test -x "$RUNNER_PYTHON"; then
+    RUNNER_PYTHON="$ROOT/.venv/bin/python"
 fi
 
 if ! test -d "$LIB"; then
@@ -64,6 +73,32 @@ if ! test -d "$LIB"; then
     exit 1
 fi
 
+ensure_runner_dependencies() {
+    if ! "$RUNNER_PYTHON" -m pip --version >/dev/null 2>&1; then
+        "$RUNNER_PYTHON" -m ensurepip --upgrade >/dev/null 2>&1
+    fi
+
+    if ! "$RUNNER_PYTHON" - <<'PY' >/dev/null 2>&1
+import importlib.util
+required = (
+    "numpy",
+    "pydantic",
+    "dateutil",
+    "qwen_agent",
+    "soundfile",
+    "torch",
+    "torchaudio",
+    "torchvision",
+    "transformers",
+)
+missing = [name for name in required if importlib.util.find_spec(name) is None]
+raise SystemExit(0 if not missing else 1)
+PY
+    then
+        "$RUNNER_PYTHON" -m pip install -r "$ROOT/../requirements.txt"
+    fi
+}
+
 cleanup_qwen_runtime() {
     (
         cd "$ROOT" && "$RUNNER_PYTHON" -m backend.llm.client stop >/dev/null 2>&1
@@ -71,6 +106,8 @@ cleanup_qwen_runtime() {
 }
 
 trap cleanup_qwen_runtime EXIT INT TERM
+
+ensure_runner_dependencies
 
 if ! (cd "$ROOT" && "$RUNNER_PYTHON" -m backend.llm.model_bootstrap); then
     echo
