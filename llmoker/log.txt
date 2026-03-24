@@ -1,14 +1,14 @@
-2026-03-23 08:33:14 UTC
+2026-03-24 07:36:43 UTC
 Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39
 Ren'Py 8.2.1.24030407
 
-Early init took 0.03s
-Loading error handling took 0.02s
-Loading script took 0.16s
-Loading save slot metadata took 0.02s
+Early init took 0.02s
+Loading error handling took 0.01s
+Loading script took 0.03s
+Loading save slot metadata took 0.01s
 Loading persistent took 0.00s
 Set script version to: (8, 2, 1)
-Running init code took 0.06s
+Running init code took 0.02s
 Loading analysis data took 0.01s
 Analyze and compile ATL took 0.00s
 Reloading save slot metadata took 0.01s
@@ -22,14 +22,14 @@ Creating interface object took 0.00s
 Cleaning stores took 0.00s
 Init translation took 0.02s
 Build styles took 0.00s
-Load screen analysis took 0.00s
+Load screen analysis took 0.01s
 Analyze screens took 0.00s
-Save screen analysis took 0.01s
+Save screen analysis took 0.00s
 Prepare screens took 0.03s
-Save pyanalysis. took 0.01s
-Save bytecode. took 0.01s
+Save pyanalysis. took 0.00s
+Save bytecode. took 0.00s
 Running _start took 0.00s
-Interface start took 0.43s
+Interface start took 0.07s
 
 Initializing gl2 renderer:
 primary display bounds: (0, 0, 1920, 1080)
@@ -42,48 +42,3 @@ Display Info: None
 Screen sizes: virtual=(1024, 576) physical=(1024, 576) drawable=(1024, 576)
 Could not open 'cache/shaders.txt':
 Maximum texture size: 4096x4096
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: match_intro / 내용: 처음 라운드야. 블라인드가 높은데, 너가 뭘 하려는 거야?
-[LLMoker][DEBUG] 라운드 1 시작 / 사야 시작 손패: 클로버 Queen, 클로버 5, 스페이드 3, 하트 8, 클로버 Ace (하이카드)
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: round_start / 내용: 새로 나온 카드, 블랙 디스커드 맞춰서 놓는 거야?
-[LLMoker][DEBUG] 사야 행동 판단 시작 / 페이즈: 첫 번째 베팅 / 손패: 클로버 Queen, 클로버 5, 스페이드 3, 하트 8, 클로버 Ace (하이카드) / 허용 행동: fold, check, bet
-[LLMoker][DEBUG] 사야 행동 선택 완료 / 선택: bet / 이유: 하이카드에서 퀸과 에이스가 있어 팟을 확보할 가능성이 높다 / 상태: Qwen 런타임 요청 성공
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: betting / 내용: 10칩 베팅한 거, 뭔가 빠진 건가?
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: betting / 내용: 드로우 라운드가 시작됐다. 카드를 봐야 진짜 상황이 뚜렷해진다.
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: draw / 내용: 드로우 끝나면 뭘 봐야 할지 알아야지.
-[LLMoker][DEBUG] 사야 카드 교체 판단 시작 / 현재 손패: 클로버 Queen, 클로버 5, 스페이드 3, 하트 8, 클로버 Ace (하이카드)
-[LLMoker][DEBUG] 사야 카드 교체 선택 완료 / 버릴 인덱스: [0, 2] / 이유: Queen과 5를 교체해 강한 쌍을 만들기 위해 / 상태: Qwen 런타임 요청 성공
-[LLMoker][DEBUG] 사야 드로우 후 손패: 스페이드 7, 클로버 5, 클로버 2, 하트 8, 클로버 Ace (하이카드)
-[LLMoker][DEBUG] 사야 행동 판단 시작 / 페이즈: 두 번째 베팅 / 손패: 스페이드 7, 클로버 5, 클로버 2, 하트 8, 클로버 Ace (하이카드) / 허용 행동: fold, check, bet
-[LLMoker][DEBUG] 사야 행동 선택 완료 / 선택: bet / 이유: 현재 족보가 하이카드라서 베팅으로 리스크를 증가시켜 상대의 반응을 유도한다 / 상태: Qwen 런타임 요청 성공
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: betting / 내용: 10칩 베팅한 거, 뭔가 빠진 건 아니야?
-[LLMoker][DEBUG] 사야 행동 판단 시작 / 페이즈: 두 번째 베팅 / 손패: 스페이드 7, 클로버 5, 클로버 2, 하트 8, 클로버 Ace (하이카드) / 허용 행동: fold, call, raise
-[LLMoker][DEBUG] 사야 행동 선택 완료 / 선택: fold / 이유: 현재 손패가 족보를 형성하지 못해 리스크가 큼 / 상태: Qwen 런타임 요청 성공
-[LLMoker][DEBUG] 사야 정책 피드백 완료 / 단기: 사야의 하이카드 손패에 대한 베팅이 플레이어의 트리플에 의해 무너졌다. / 장기: 상대가 하이카드를 보유할 가능성이 높을 때는 초기 베팅으로 리스크를 유도한다. / 초점: 드로우 후의 손패 강화 여부를 정확히 판단한다.
-[LLMoker][DEBUG] 폴드 종료 / 승자: 플레이어 / 팟: 60칩 / 사야 손패: 스페이드 7, 클로버 5, 클로버 2, 하트 8, 클로버 Ace (하이카드)
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: betting / 내용: 트리플 나온 거 봤어? 하이카드는 뭐야, 팟 60칩 봤어?
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: round_end / 내용: 트리플 나왔으니, 하이카드는 끝났어.
-[LLMoker][DEBUG] 라운드 2 시작 / 사야 시작 손패: 다이아 4, 하트 Queen, 스페이드 Jack, 클로버 4, 다이아 Queen (투페어)
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: round_start / 내용: 카드 들어온 거 봤어? 나도 뭔가 놓친 건 아니야.
-[LLMoker][DEBUG] 사야 행동 판단 시작 / 페이즈: 첫 번째 베팅 / 손패: 다이아 4, 하트 Queen, 스페이드 Jack, 클로버 4, 다이아 Queen (투페어) / 허용 행동: fold, check, bet
-[LLMoker][DEBUG] 사야 행동 선택 완료 / 선택: bet / 이유: 현재 팟이 작고 상대의 스택이 길어지기 때문에 리스크를 관리하기 위해 베팅한다. / 상태: Qwen 런타임 요청 성공
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: betting / 내용: 10칩 베팅했어? 라이스가 떨어졌다는 걸 알아서 봐.
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: betting / 내용: 드로우가 시작됐다. 카드 봐야겠어.
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: draw / 내용: 드로우 뽑는 거야, 카드 봤어?
-[LLMoker][DEBUG] 사야 카드 교체 판단 시작 / 현재 손패: 다이아 4, 하트 Queen, 스페이드 Jack, 클로버 4, 다이아 Queen (투페어)
-[LLMoker][DEBUG] 사야 카드 교체 선택 완료 / 버릴 인덱스: [0, 2] / 이유: 다이아 4와 스페이드 Jack을 교체해 투페어을 강화한다. / 상태: Qwen 런타임 요청 성공
-[LLMoker][DEBUG] 사야 드로우 후 손패: 클로버 King, 하트 Queen, 하트 2, 클로버 4, 다이아 Queen (원페어)
-[LLMoker][DEBUG] 사야 행동 판단 시작 / 페이즈: 두 번째 베팅 / 손패: 클로버 King, 하트 Queen, 하트 2, 클로버 4, 다이아 Queen (원페어) / 허용 행동: fold, check, bet
-[LLMoker][DEBUG] 사야 행동 선택 완료 / 선택: bet / 이유: 현재 족보가 원페어로 상대의 강한 패를 예상하기에 베팅이 적절하다 / 상태: Qwen 런타임 요청 성공
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: betting / 내용: 10칩 베팅한 거, 뭔가 흔들리고 있는 거야?
-[LLMoker][DEBUG] 쇼다운 / 플레이어: 하트 8, 클로버 Jack, 다이아 Jack, 클로버 5, 클로버 2 (원페어) / 사야: 클로버 King, 하트 Queen, 하트 2, 클로버 4, 다이아 Queen (원페어)
-[LLMoker][DEBUG] 사야 정책 피드백 완료 / 단기: 상대의 하이카드 강세를 예상한 초기 베팅이 플레이어의 트리플에 의해 무너졌다. / 장기: 상대가 하이카드를 보유할 가능성이 높을 때는 초기 베팅으로 리스크를 유도한다. / 초점: 상대의 하이카드 가능성에 주의
-[LLMoker][DEBUG] 쇼다운 결과 / 승자: 사야 / 팟: 50칩
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: betting / 내용: 원페어가 뭐가 뭐가 되는 거야, 팟 50칩이야.
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: round_end / 내용: 원페어 나온 데서 50칩 빼앗겼다. 턴에서 놓친 거야.
-Cleaning stores took 0.00s
-Init translation took 0.00s
-Build styles took 0.00s
-Load screen analysis took 0.01s
-Analyze screens took 0.00s
-Prepare screens took 0.00s
-Running _start took 0.00s

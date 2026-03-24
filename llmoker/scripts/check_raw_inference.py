@@ -30,7 +30,6 @@ def build_client():
         model_name=config.llm_model_name,
         runtime_python=config.llm_runtime_python,
         device=config.llm_device,
-        runtime_port=config.llm_runtime_port,
     )
 
 
@@ -43,7 +42,7 @@ def build_chat_payload(mode, max_tokens):
         max_tokens: 최대 출력 토큰 수다.
 
     Returns:
-        런타임 `/run`에 보낼 raw chat 요청 사전이다.
+        런타임 IPC에 보낼 raw chat 요청 사전이다.
     """
 
     if mode == "sanity":

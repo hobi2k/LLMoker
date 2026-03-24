@@ -17,7 +17,7 @@ from pathlib import Path
 import torch
 from qwen_agent.agents.fncall_agent import FnCallAgent
 
-from backend.llm.results import build_error_result, build_success_result, normalize_error_reason
+from backend.llm.vllm_backup.results import build_error_result, build_success_result, normalize_error_reason
 from backend.llm.tools import build_poker_tools, clear_tool_context, set_tool_context
 
 

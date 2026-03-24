@@ -4,7 +4,6 @@ label poker_minigame:
     $ poker_fatal_error_text = ""
     $ play_poker_game_music()
     window hide
-    $ start_llm_npc()
     if not poker_match_intro_seen:
         $ play_dialogue_event("match_intro")
         $ poker_match_intro_seen = True

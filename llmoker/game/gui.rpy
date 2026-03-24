@@ -8,7 +8,6 @@ init offset = -2
 
 define llmoker_gui_width = 1024
 define llmoker_gui_height = 576
-define llmoker_gui_scale = 1024.0 / 1920.0
 
 ## Calling gui.init resets the styles to sensible default values, and sets the
 ## width and height of the game.
@@ -17,16 +16,16 @@ init python:
 
     def gui_scale(value):
         """
-        1920 기준 값을 현재 LLMoker GUI 비율에 맞는 픽셀 값으로 바꾼다.
+        현재 1024x576 GUI 좌표계에서 바로 쓸 정수 픽셀 값으로 정리한다.
 
         Args:
-            value: 1920x1080 기준으로 잡은 원래 픽셀 값이다.
+            value: 현재 GUI 좌표계에서 사용할 픽셀 값이다.
 
         Returns:
-            현재 GUI 해상도에 맞춰 축소된 정수 픽셀 값이다.
+            Ren'Py 스타일과 screen 값에 바로 넣을 정수 픽셀 값이다.
         """
 
-        return int(round(value * llmoker_gui_scale))
+        return int(round(value))
 
 ## Enable checks for invalid or unstable properties in screens or transforms
 define config.check_conflicting_properties = True
@@ -83,22 +82,22 @@ define gui.name_text_font = "fonts/malgunbd.ttf"
 define gui.interface_text_font = "fonts/malgunbd.ttf"
 
 ## The size of normal dialogue text.
-define gui.text_size = 19
+define gui.text_size = 23
 
 ## The size of character names.
-define gui.name_text_size = 26
+define gui.name_text_size = 30
 
 ## The size of text in the game's user interface.
-define gui.interface_text_size = 19
+define gui.interface_text_size = 24
 
 ## The size of labels in the game's user interface.
-define gui.label_text_size = 20
+define gui.label_text_size = 25
 
 ## The size of text on the notify screen.
 define gui.notify_text_size = 13
 
 ## The size of the game's title.
-define gui.title_text_size = 40
+define gui.title_text_size = 46
 
 
 ## Main and Game Menus #########################################################
@@ -114,7 +113,7 @@ define gui.game_menu_background = "gui/game_menu.png"
 ## time.
 
 ## The height of the textbox containing dialogue.
-define gui.textbox_height = 142
+define gui.textbox_height = 154
 
 ## The placement of the textbox vertically on the screen. 0.0 is the top, 0.5 is
 ## center, and 1.0 is the bottom.
@@ -123,8 +122,8 @@ define gui.textbox_yalign = 1.0
 
 ## The placement of the speaking character's name, relative to the textbox.
 ## These can be a whole number of pixels from the left or top, or 0.5 to center.
-define gui.name_xpos = 48
-define gui.name_ypos = -34
+define gui.name_xpos = 42
+define gui.name_ypos = -54
 
 ## The horizontal alignment of the character's name. This can be 0.0 for left-
 ## aligned, 0.5 for centered, and 1.0 for right-aligned.
@@ -132,8 +131,8 @@ define gui.name_xalign = 0.0
 
 ## The width, height, and borders of the box containing the character's name, or
 ## None to automatically size it.
-define gui.namebox_width = 196
-define gui.namebox_height = 46
+define gui.namebox_width = 278
+define gui.namebox_height = 64
 
 ## The borders of the box containing the character's name, in left, top, right,
 ## bottom order.
@@ -147,11 +146,11 @@ define gui.namebox_tile = False
 ## The placement of dialogue relative to the textbox. These can be a whole
 ## number of pixels relative to the left or top side of the textbox, or 0.5 to
 ## center.
-define gui.dialogue_xpos = 42
-define gui.dialogue_ypos = 40
+define gui.dialogue_xpos = 38
+define gui.dialogue_ypos = 52
 
 ## The maximum width of dialogue text, in pixels.
-define gui.dialogue_width = 920
+define gui.dialogue_width = 948
 
 ## The horizontal alignment of the dialogue text. This can be 0.0 for left-
 ## aligned, 0.5 for centered, and 1.0 for right-aligned.
@@ -265,7 +264,7 @@ define gui.file_slot_rows = 2
 
 ## The position of the left side of the navigation buttons, relative to the left
 ## side of the screen.
-define gui.navigation_xpos = 32
+define gui.navigation_xpos = 28
 
 ## The vertical position of the skip indicator.
 define gui.skip_ypos = 8
@@ -277,7 +276,7 @@ define gui.notify_ypos = 36
 define gui.choice_spacing = 18
 
 ## Buttons in the navigation section of the main and game menus.
-define gui.navigation_spacing = 3
+define gui.navigation_spacing = 6
 
 ## Controls the amount of spacing between preferences.
 define gui.pref_spacing = 8

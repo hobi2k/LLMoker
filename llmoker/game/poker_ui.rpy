@@ -164,29 +164,29 @@ screen poker_table_screen(mode="betting_open"):
 
     if mode != "round_end":
         frame:
-            xalign 0.968
-            yalign 0.04
-            xmaximum gui_scale(420)
-            padding (gui_scale(20), gui_scale(18))
+            xalign 0.972
+            yalign 0.03
+            xmaximum gui_scale(270)
+            padding (gui_scale(18), gui_scale(18))
             background "#09101be0"
 
             vbox:
-                spacing 10
-                text "페이즈: [get_poker_match().phase_name_ko()]" size gui_scale(28) color "#f5f5f5" font "fonts/malgunbd.ttf"
-                text "팟: [get_poker_match().pot]칩" size gui_scale(26) color "#f5f5f5" font "fonts/malgunbd.ttf"
-                text "당신 [get_poker_match().player.stack] / [get_poker_match().bot.name] [get_poker_match().bot.stack]" size gui_scale(21) color "#edf3ff" font "fonts/malgun.ttf"
-                text "상대 AI: [get_poker_match().get_bot_mode_label()]" size gui_scale(20) color "#9ed6ff" font "fonts/malgunbd.ttf"
-                text "현재 족보: [get_poker_match().get_player_hand_name()]" size gui_scale(24) color "#ffd77a" font "fonts/malgunbd.ttf"
+                spacing 9
+                text "페이즈: [get_poker_match().phase_name_ko()]" size gui_scale(24) color "#f5f5f5" font "fonts/malgunbd.ttf"
+                text "팟: [get_poker_match().pot]칩" size gui_scale(22) color "#f5f5f5" font "fonts/malgunbd.ttf"
+                text "당신 [get_poker_match().player.stack] / [get_poker_match().bot.name] [get_poker_match().bot.stack]" size gui_scale(17) color "#edf3ff" font "fonts/malgun.ttf"
+                text "상대 AI: [get_poker_match().get_bot_mode_label()]" size gui_scale(17) color "#9ed6ff" font "fonts/malgunbd.ttf"
+                text "현재 족보: [get_poker_match().get_player_hand_name()]" size gui_scale(20) color "#ffd77a" font "fonts/malgunbd.ttf"
                 if poker_status_text:
-                    text "[poker_status_text]" size gui_scale(19) color "#ffe082" font "fonts/malgunbd.ttf" xmaximum gui_scale(376)
+                    text "[poker_status_text]" size gui_scale(16) color "#ffe082" font "fonts/malgunbd.ttf" xmaximum gui_scale(234)
 
     if mode == "round_end":
         frame:
             xalign 0.5
-            yalign 0.31
-            xmaximum gui_scale(978)
-            ymaximum gui_scale(468)
-            padding (gui_scale(20), gui_scale(14))
+            yalign 0.11
+            xmaximum gui_scale(964)
+            ymaximum gui_scale(470)
+            padding (gui_scale(20), gui_scale(16))
             background "#070a12da"
 
             vbox:
@@ -194,21 +194,21 @@ screen poker_table_screen(mode="betting_open"):
 
                 vbox:
                     spacing 7
-                    text "[get_poker_match().get_round_result_title()]" size gui_scale(31) color "#ffffff" font "fonts/malgunbd.ttf"
-                    text "[get_poker_match().get_round_result_message()]" size gui_scale(18) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(890)
+                    text "[get_poker_match().get_round_result_title()]" size gui_scale(30) color "#ffffff" font "fonts/malgunbd.ttf"
+                    text "[get_poker_match().get_round_result_message()]" size gui_scale(18) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(900)
                     if get_poker_match().is_match_finished():
-                        text "[get_poker_match().get_match_result_message()]" size gui_scale(18) color "#ffcf88" font "fonts/malgunbd.ttf" xmaximum gui_scale(890)
+                        text "[get_poker_match().get_match_result_message()]" size gui_scale(18) color "#ffcf88" font "fonts/malgunbd.ttf" xmaximum gui_scale(900)
                     else:
-                        text "[get_poker_match().get_match_result_message()]" size gui_scale(17) color "#9fd3ff" font "fonts/malgun.ttf" xmaximum gui_scale(890)
+                        text "[get_poker_match().get_match_result_message()]" size gui_scale(18) color "#9fd3ff" font "fonts/malgun.ttf" xmaximum gui_scale(900)
 
                 frame:
-                    xmaximum gui_scale(918)
+                    xmaximum gui_scale(914)
                     padding (gui_scale(14), gui_scale(12))
                     background "#0d1320eb"
 
                     vbox:
                         spacing 9
-                        text "[get_poker_match().bot.name]의 패" size gui_scale(23) color "#ffffff" font "fonts/malgunbd.ttf"
+                        text "[get_poker_match().bot.name]의 패" size gui_scale(24) color "#ffffff" font "fonts/malgunbd.ttf"
                         text "족보: [get_poker_match().get_bot_hand_name()]  |  현재 스택: [get_poker_match().bot.stack]칩" size gui_scale(18) color "#ffe8a3" font "fonts/malgun.ttf"
                         hbox:
                             spacing 6
@@ -216,18 +216,18 @@ screen poker_table_screen(mode="betting_open"):
                             for i, card in enumerate(get_poker_match().get_bot_hand(True)):
                                 vbox:
                                     spacing 4
-                                    xsize gui_scale(136)
-                                    add Transform(player_card_path(card, "idle"), zoom=0.38)
+                                    xsize gui_scale(142)
+                                    add Transform(player_card_path(card, "idle"), zoom=0.42)
                                     text "카드 [i + 1]" size gui_scale(15) color "#ffffff" xalign 0.5 font "fonts/malgunbd.ttf"
 
                 frame:
-                    xmaximum gui_scale(918)
+                    xmaximum gui_scale(914)
                     padding (gui_scale(14), gui_scale(12))
                     background "#0d1320eb"
 
                     vbox:
                         spacing 9
-                        text "당신의 패" size gui_scale(23) color "#ffffff" font "fonts/malgunbd.ttf"
+                        text "당신의 패" size gui_scale(24) color "#ffffff" font "fonts/malgunbd.ttf"
                         text "족보: [get_poker_match().get_player_hand_name()]  |  현재 스택: [get_poker_match().player.stack]칩" size gui_scale(18) color "#ffe8a3" font "fonts/malgun.ttf"
                         hbox:
                             spacing 6
@@ -235,38 +235,38 @@ screen poker_table_screen(mode="betting_open"):
                             for i, card in enumerate(get_poker_match().get_player_hand()):
                                 vbox:
                                     spacing 4
-                                    xsize gui_scale(136)
-                                    add Transform(player_card_path(card, "idle"), zoom=0.38)
+                                    xsize gui_scale(142)
+                                    add Transform(player_card_path(card, "idle"), zoom=0.42)
                                     text "카드 [i + 1]" size gui_scale(15) color "#ffffff" xalign 0.5 font "fonts/malgunbd.ttf"
     else:
         frame:
             xalign 0.5
-            yalign 0.64
-            xmaximum gui_scale(1020)
+            yalign 0.49
+            xmaximum gui_scale(860)
             padding (gui_scale(16), gui_scale(16))
             background "#0b0f17b8"
 
             hbox:
-                spacing 10
+                spacing 12
                 for i, card in enumerate(get_poker_match().get_player_hand()):
                     vbox:
-                        spacing 7
+                        spacing 6
                         if mode == "draw":
                             imagebutton:
-                                idle Transform(player_card_path(card, "idle"), zoom=0.64)
-                                hover Transform(player_card_path(card, "hover"), zoom=0.64)
+                                idle Transform(player_card_path(card, "idle"), zoom=0.60)
+                                hover Transform(player_card_path(card, "hover"), zoom=0.60)
                                 action Function(toggle_discard_selection, i)
                         else:
-                            add Transform(player_card_path(card, "idle"), zoom=0.64)
+                            add Transform(player_card_path(card, "idle"), zoom=0.60)
                         if mode == "draw" and i in poker_selected_discards:
-                            text "교체 선택" size gui_scale(20) color "#ffdd66" xalign 0.5 font "fonts/malgunbd.ttf"
+                            text "교체 선택" size gui_scale(19) color "#ffdd66" xalign 0.5 font "fonts/malgunbd.ttf"
                         else:
-                            text "카드 [i + 1]" size gui_scale(20) color "#ffffff" xalign 0.5 font "fonts/malgunbd.ttf"
+                            text "카드 [i + 1]" size gui_scale(18) color "#ffffff" xalign 0.5 font "fonts/malgunbd.ttf"
 
     if mode == "round_end":
         frame:
             xalign 0.03
-            yalign 0.965
+            yalign 0.985
             padding (gui_scale(10), gui_scale(8))
             background "#05070dc8"
 
@@ -282,8 +282,8 @@ screen poker_table_screen(mode="betting_open"):
                     action MainMenu(confirm=False)
 
         frame:
-            xalign 0.97
-            yalign 0.965
+            xalign 0.978
+            yalign 0.985
             padding (gui_scale(10), gui_scale(8))
             background "#05070dc8"
 
@@ -300,12 +300,12 @@ screen poker_table_screen(mode="betting_open"):
     else:
         frame:
             xalign 0.03
-            yalign 0.965
-            padding (gui_scale(14), gui_scale(9))
+            yalign 0.985
+            padding (gui_scale(10), gui_scale(8))
             background "#05070dc8"
 
             hbox:
-                spacing 10
+                spacing 8
                 if mode == "betting":
                     if "check" in get_poker_match().get_player_available_actions():
                         textbutton "체크":
@@ -329,8 +329,8 @@ screen poker_table_screen(mode="betting_open"):
                         action [SetVariable("poker_selected_discards", []), Return("confirm")]
 
         frame:
-            xalign 0.97
-            yalign 0.965
+            xalign 0.978
+            yalign 0.985
             padding (gui_scale(10), gui_scale(8))
             background "#05070dc8"
 

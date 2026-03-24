@@ -53,7 +53,6 @@ init python:
                 local_model_path=backend_config.local_llm_path,
                 llm_runtime_python=backend_config.llm_runtime_python,
                 llm_device=backend_config.llm_device,
-                llm_runtime_port=backend_config.llm_runtime_port,
             )
 
         return store._poker_match_runtime

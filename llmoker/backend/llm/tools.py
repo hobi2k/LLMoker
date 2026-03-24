@@ -41,7 +41,7 @@ def _items_to_text(items):
             text = str(item)
         text = " ".join(text.split())
         if text:
-            lines.append("- %s" % text)
+            lines.append(text)
     return "\n".join(lines) if lines else "(없음)"
 
 
@@ -123,12 +123,14 @@ class GetMemoryTool(BaseTool):
 
         args = self._verify_json_format_args(params)
         scope = args["scope"]
-        limit = max(1, int(args.get("limit", 5)))
+        limit = args.get("limit")
         if scope == "long_term":
             items = _TOOL_CONTEXT.get("long_term_memory", [])
         else:
             items = _TOOL_CONTEXT.get("recent_feedback", [])
-        return _items_to_text(items[:limit])
+        if limit is None:
+            return _items_to_text(items)
+        return _items_to_text(items[: max(1, int(limit))])
 
 
 class GetRecentLogTool(BaseTool):
@@ -163,8 +165,11 @@ class GetRecentLogTool(BaseTool):
         """
 
         args = self._verify_json_format_args(params)
-        limit = max(1, int(args.get("limit", 8)))
-        return _items_to_text(_TOOL_CONTEXT.get("recent_log", [])[:limit])
+        limit = args.get("limit")
+        logs = _TOOL_CONTEXT.get("recent_log", [])
+        if limit is None:
+            return _items_to_text(logs)
+        return _items_to_text(logs[: max(1, int(limit))])
 
 
 class GetRoundSummaryTool(BaseTool):

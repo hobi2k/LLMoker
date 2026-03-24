@@ -19,7 +19,6 @@ class BackendConfig:
         llm_model_name: 표시용 모델 이름이다.
         llm_runtime_python: transformers 런타임 실행용 Python 3.11 경로다.
         llm_device: transformers 실행 디바이스 힌트다.
-        llm_runtime_port: LLM 런타임 HTTP 포트다.
         memory_db_path: 기억 SQLite 경로다.
         replay_db_path: 리플레이 SQLite 경로다.
         save_db_path: 세이브 SQLite 경로다.
@@ -35,7 +34,6 @@ class BackendConfig:
     llm_model_name: str = "Qwen3-4B-Instruct-2507"
     llm_runtime_python: str = "./.venv/bin/python"
     llm_device: str = "auto"
-    llm_runtime_port: int = 8011
     memory_db_path: str = "./data/memory/memory.sqlite3"
     replay_db_path: str = "./data/replays/replays.sqlite3"
     save_db_path: str = "./data/save/game_state.sqlite3"
@@ -61,7 +59,6 @@ def load_backend_config(base_dir):
         default_runtime_python = "python3"
     llm_runtime_python = os.environ.get("LLM_RUNTIME_PYTHON", default_runtime_python)
     llm_device = os.environ.get("LLM_DEVICE", "auto")
-    llm_runtime_port = int(os.environ.get("LLM_RUNTIME_PORT", "8011"))
     memory_db_path = os.environ.get(
         "MEMORY_DB_PATH",
         os.path.join(base_dir, "data", "memory", "memory.sqlite3"),
@@ -86,7 +83,6 @@ def load_backend_config(base_dir):
         llm_model_name=llm_model_name,
         llm_runtime_python=llm_runtime_python,
         llm_device=llm_device,
-        llm_runtime_port=llm_runtime_port,
         memory_db_path=memory_db_path,
         replay_db_path=replay_db_path,
         save_db_path=save_db_path,

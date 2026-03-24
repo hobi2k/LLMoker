@@ -1,16 +1,14 @@
-"""Transformers 런타임 서버를 시작하고 요청을 보내는 클라이언트다."""
+"""Transformers 런타임 IPC 프로세스를 시작하고 요청을 보내는 클라이언트다."""
 
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import select
 import signal
 import subprocess
 import sys
-import time
-import urllib.error
-import urllib.request
 from pathlib import Path
 
 
@@ -22,15 +20,13 @@ RUNTIME_PID_PATH = LOG_DIR / "qwen_runtime.pid"
 
 class QwenRuntimeClient:
     """
-    Ren'Py 프로세스에서 transformers 런타임 서버를 시작하고 요청을 보낸다.
+    Ren'Py 프로세스에서 transformers 런타임 IPC 프로세스를 시작하고 요청을 보낸다.
 
     Args:
         model_path: 로컬 모델 폴더 경로다.
         model_name: 표시용 모델 이름이다.
         runtime_python: 런타임을 띄울 Python 3.11 실행 파일 경로다.
         device: transformers 실행 디바이스 힌트다.
-        runtime_host: 런타임 HTTP 서버 호스트다.
-        runtime_port: 런타임 HTTP 서버 포트다.
     """
 
     _process = None
@@ -42,15 +38,11 @@ class QwenRuntimeClient:
         model_name,
         runtime_python,
         device,
-        runtime_host="127.0.0.1",
-        runtime_port=8011,
     ):
         self.model_path = model_path
         self.model_name = model_name
         self.runtime_python = runtime_python
         self.device = device
-        self.runtime_host = runtime_host
-        self.runtime_port = int(runtime_port)
         self.last_status = "LLM 런타임이 아직 시작되지 않았습니다."
 
     def configure(
@@ -59,8 +51,6 @@ class QwenRuntimeClient:
         model_name=None,
         runtime_python=None,
         device=None,
-        runtime_host=None,
-        runtime_port=None,
     ):
         """
         런타임 구성을 바꾸고 필요하면 다음 요청에서 다시 시작하게 만든다.
@@ -70,8 +60,6 @@ class QwenRuntimeClient:
             model_name: 새 모델 이름이다.
             runtime_python: 새 Python 3.11 경로다.
             device: 새 디바이스 힌트다.
-            runtime_host: 새 런타임 호스트다.
-            runtime_port: 새 런타임 포트다.
         """
 
         if model_path is not None:
@@ -82,10 +70,6 @@ class QwenRuntimeClient:
             self.runtime_python = runtime_python
         if device is not None:
             self.device = device
-        if runtime_host is not None:
-            self.runtime_host = runtime_host
-        if runtime_port is not None:
-            self.runtime_port = int(runtime_port)
         if self._signature != self.signature():
             self.stop()
 
@@ -102,29 +86,7 @@ class QwenRuntimeClient:
             self.model_name,
             self.runtime_python,
             self.device,
-            self.runtime_host,
-            self.runtime_port,
         )
-
-    def health_url(self):
-        """
-        상태 확인용 URL을 만든다.
-
-        Returns:
-            `/health` 엔드포인트 URL 문자열이다.
-        """
-
-        return "http://%s:%d/health" % (self.runtime_host, self.runtime_port)
-
-    def run_url(self):
-        """
-        작업 실행용 URL을 만든다.
-
-        Returns:
-            `/run` 엔드포인트 URL 문자열이다.
-        """
-
-        return "http://%s:%d/run" % (self.runtime_host, self.runtime_port)
 
     def has_model_files(self):
         """
@@ -154,15 +116,17 @@ class QwenRuntimeClient:
 
     def runtime_info(self):
         """
-        현재 런타임 서버의 상태를 읽는다.
+        현재 연결된 런타임 프로세스의 상태를 읽는다.
 
         Returns:
-            서버가 응답하면 상태 사전, 아니면 None이다.
+            런타임이 응답하면 상태 사전, 아니면 None이다.
         """
 
+        process = self.__class__._process
+        if process is None or process.poll() is not None:
+            return None
         try:
-            with urllib.request.urlopen(self.health_url(), timeout=2) as response:
-                return json.loads(response.read().decode("utf-8"))
+            return self._request_via_pipe({"mode": "__health__"}, timeout_seconds=2)
         except Exception:
             return None
 
@@ -179,9 +143,53 @@ class QwenRuntimeClient:
             return False
         return payload.get("status") == "ready" and payload.get("model_name") == self.model_name
 
+    def _read_pipe_line(self, timeout_seconds):
+        """
+        stdout 파이프에서 JSON 한 줄을 시간 제한 안에 읽는다.
+
+        Args:
+            timeout_seconds: 대기 시간이다.
+
+        Returns:
+            읽은 한 줄 문자열이다.
+        """
+
+        process = self.__class__._process
+        if process is None or process.stdout is None:
+            raise RuntimeError("LLM 런타임 파이프가 준비되지 않았습니다.")
+
+        ready, _, _ = select.select([process.stdout], [], [], timeout_seconds)
+        if not ready:
+            raise RuntimeError("LLM 런타임 응답 대기 시간이 초과되었습니다.")
+
+        line = process.stdout.readline()
+        if not line:
+            raise RuntimeError("LLM 런타임이 예기치 않게 종료되었습니다.")
+        return line.strip()
+
+    def _request_via_pipe(self, payload, timeout_seconds):
+        """
+        stdin/stdout IPC로 런타임에 요청 하나를 보낸다.
+
+        Args:
+            payload: 런타임 요청 사전이다.
+            timeout_seconds: 응답 대기 시간이다.
+
+        Returns:
+            런타임 응답 사전이다.
+        """
+
+        process = self.__class__._process
+        if process is None or process.poll() is not None or process.stdin is None:
+            raise RuntimeError("LLM 런타임 프로세스가 살아 있지 않습니다.")
+
+        process.stdin.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        process.stdin.flush()
+        return json.loads(self._read_pipe_line(timeout_seconds))
+
     def start(self, timeout_seconds=180):
         """
-        런타임 서버를 시작하고 준비 완료까지 기다린다.
+        런타임 IPC 프로세스를 시작하고 준비 완료까지 기다린다.
 
         Args:
             timeout_seconds: 준비 완료까지 기다릴 최대 시간이다.
@@ -194,10 +202,6 @@ class QwenRuntimeClient:
             self.last_status = self.missing_model_message()
             return False
 
-        runtime_info = self.runtime_info()
-        if runtime_info and runtime_info.get("status") == "ready" and runtime_info.get("model_name") != self.model_name:
-            self.stop()
-
         if self.is_running():
             self.last_status = "Transformers 런타임 준비 완료"
             self._signature = self.signature()
@@ -209,22 +213,23 @@ class QwenRuntimeClient:
             process = self.launch()
             self.__class__._process = process
             self.__class__._signature = self.signature()
-
-        started_at = time.time()
-        while time.time() - started_at < timeout_seconds:
-            if self.is_running():
+            try:
+                payload = json.loads(self._read_pipe_line(timeout_seconds))
+            except Exception:
+                self.last_status = self.read_runtime_error()
+                return False
+            if payload.get("status") == "ready" and payload.get("model_name") == self.model_name:
                 self.last_status = "Transformers 런타임 준비 완료"
                 return True
-            if self._process is not None and self._process.poll() is not None:
-                break
-            time.sleep(1.0)
+            self.last_status = payload.get("error") or payload.get("status") or self.read_runtime_error()
+            return False
 
-        self.last_status = self.read_runtime_error()
-        return False
+        self.last_status = "Transformers 런타임 준비 완료"
+        return True
 
     def launch(self):
         """
-        새 런타임 프로세스를 백그라운드로 띄운다.
+        새 런타임 IPC 프로세스를 백그라운드로 띄운다.
 
         Returns:
             실행된 `Popen` 객체다.
@@ -244,18 +249,16 @@ class QwenRuntimeClient:
             self.model_name,
             "--device",
             self.device,
-            "--host",
-            self.runtime_host,
-            "--port",
-            str(self.runtime_port),
         ]
         process = subprocess.Popen(
             command,
             cwd=str(ROOT_DIR),
             env=env,
-            stdout=log_file,
-            stderr=subprocess.STDOUT,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=log_file,
             text=True,
+            bufsize=1,
             start_new_session=True,
         )
         RUNTIME_PID_PATH.write_text(str(process.pid), encoding="utf-8")
@@ -263,7 +266,7 @@ class QwenRuntimeClient:
 
     def read_runtime_error(self):
         """
-        최근 런타임 로그를 읽어 실패 원인을 사람이 읽기 쉬운 문자열로 만든다.
+        최근 런타임 stderr 로그를 읽어 실패 원인을 문자열로 만든다.
 
         Returns:
             실패 원인 문자열이다.
@@ -293,7 +296,7 @@ class QwenRuntimeClient:
 
     def request(self, payload, timeout_seconds=120):
         """
-        런타임 서버에 작업 하나를 보내고 JSON 응답을 받는다.
+        런타임 IPC 프로세스에 작업 하나를 보내고 JSON 응답을 받는다.
 
         Args:
             payload: 런타임에 전달할 작업 사전이다.
@@ -306,23 +309,16 @@ class QwenRuntimeClient:
         if not self.start():
             return {"status": "error", "error": self.last_status}
 
-        request = urllib.request.Request(
-            self.run_url(),
-            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
         try:
-            with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
-                return json.loads(response.read().decode("utf-8"))
-        except urllib.error.HTTPError as exc:
-            body = exc.read().decode("utf-8", errors="ignore")
-            try:
-                error_payload = json.loads(body)
-                self.last_status = error_payload.get("error", body)
-            except Exception:
-                self.last_status = body or str(exc)
-            return {"status": "error", "error": self.last_status}
+            response = self._request_via_pipe(payload, timeout_seconds)
+            if not isinstance(response, dict):
+                self.last_status = "LLM 런타임이 사전 형식이 아닌 응답을 반환했습니다."
+                return {"status": "error", "error": self.last_status}
+            if response.get("status") != "ok":
+                self.last_status = response.get("error") or response.get("reason") or "LLM 런타임 요청 실패"
+            else:
+                self.last_status = response.get("reason", "LLM 런타임 요청 성공")
+            return response
         except Exception as exc:
             self.last_status = str(exc).strip() or "LLM 런타임 요청 실패"
             return {"status": "error", "error": self.last_status}
@@ -334,6 +330,11 @@ class QwenRuntimeClient:
 
         process = self.__class__._process
         if process is not None and process.poll() is None:
+            try:
+                if process.stdin is not None:
+                    process.stdin.close()
+            except OSError:
+                pass
             try:
                 os.killpg(process.pid, signal.SIGTERM)
             except ProcessLookupError:
@@ -370,20 +371,22 @@ def main():
     start_parser.add_argument("--model-name", required=True)
     start_parser.add_argument("--runtime-python", default=sys.executable)
     start_parser.add_argument("--device", default="auto")
-    start_parser.add_argument("--host", default="127.0.0.1")
-    start_parser.add_argument("--port", type=int, default=8011)
-
-    health_parser = subparsers.add_parser("health")
-    health_parser.add_argument("--host", default="127.0.0.1")
-    health_parser.add_argument("--port", type=int, default=8011)
+    subparsers.add_parser("health")
 
     subparsers.add_parser("stop")
 
     args = parser.parse_args()
 
     if args.command == "health":
-        client = QwenRuntimeClient(".", "unused", sys.executable, "auto", args.host, args.port)
-        payload = {"status": "ready" if client.is_running() else "stopped"}
+        running = False
+        if RUNTIME_PID_PATH.exists():
+            try:
+                runtime_pid = int(RUNTIME_PID_PATH.read_text(encoding="utf-8").strip())
+                os.kill(runtime_pid, 0)
+                running = True
+            except (OSError, ValueError):
+                running = False
+        payload = {"status": "running" if running else "stopped"}
         print(json.dumps(payload, ensure_ascii=False))
         return 0
 
@@ -397,8 +400,6 @@ def main():
         model_name=args.model_name,
         runtime_python=args.runtime_python,
         device=args.device,
-        runtime_host=args.host,
-        runtime_port=args.port,
     )
     ok = client.start()
     if ok:

@@ -60,7 +60,7 @@ def build_payloads():
     대사, 행동, 카드 교체, 회고 요청을 한 번에 검증할 수 있도록 요청 사전을 만든다.
 
     Returns:
-        런타임 `/run` 엔드포인트에 바로 보낼 요청 사전 목록이다.
+        런타임 IPC에 바로 보낼 요청 사전 목록이다.
     """
 
     context = build_context()
@@ -118,7 +118,7 @@ def build_client():
     현재 프로젝트 설정을 읽어 transformers 런타임 클라이언트를 만든다.
 
     Returns:
-        모델 경로와 포트를 포함해 준비된 `QwenRuntimeClient` 객체다.
+        현재 설정 기준으로 준비된 `QwenRuntimeClient` 객체다.
     """
 
     config = load_backend_config(str(PROJECT_ROOT))
@@ -127,7 +127,6 @@ def build_client():
         model_name=config.llm_model_name,
         runtime_python=config.llm_runtime_python,
         device=config.llm_device,
-        runtime_port=config.llm_runtime_port,
     )
 
 

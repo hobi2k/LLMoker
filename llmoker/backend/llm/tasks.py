@@ -13,45 +13,6 @@ from backend.llm.prompts import (
 )
 
 
-def _clip_text(text, limit=48):
-    """
-    너무 긴 로그나 기억 문장을 짧게 잘라 모델 문맥 길이를 줄인다.
-
-    Args:
-        text: 줄일 원본 문자열이다.
-        limit: 유지할 최대 길이다.
-
-    Returns:
-        짧아진 문자열이다.
-    """
-
-    compact = " ".join(str(text or "").split())
-    if len(compact) <= limit:
-        return compact
-    return compact[:limit] + "..."
-
-
-def _compress_memory_items(items, limit=1):
-    """
-    기억 항목 목록에서 최근 몇 줄만 짧은 문자열로 뽑아낸다.
-
-    Args:
-        items: 기억 항목 사전 목록이다.
-        limit: 남길 최대 항목 수다.
-
-    Returns:
-        짧게 요약된 기억 문자열 목록이다.
-    """
-
-    output = []
-    for item in (items or [])[-limit:]:
-        if isinstance(item, dict):
-            output.append(_clip_text(item.get("text", "")))
-        else:
-            output.append(_clip_text(item))
-    return output
-
-
 @dataclass
 class PokerAgentTask:
     """
@@ -87,31 +48,6 @@ class PokerAgentTask:
         return payload
 
 
-def build_shared_context(match, legal_actions, recent_feedback, long_term_memory, recent_log_limit=2):
-    """
-    행동, 드로우, 대사 작업이 공통으로 쓰는 공개 문맥을 만든다.
-
-    Args:
-        match: 현재 포커 매치 객체다.
-        legal_actions: 현재 턴 기준 허용 행동 목록이다.
-        recent_feedback: 단기 기억 목록이다.
-        long_term_memory: 장기 기억 목록이다.
-        recent_log_limit: 최근 공개 로그를 몇 줄까지 넣을지 정하는 값이다.
-
-    Returns:
-        공개 상태, 기억, 공개 로그를 담은 context 사전이다.
-    """
-
-    return {
-        "public_state": build_public_state_text(match, legal_actions),
-        "recent_feedback": _compress_memory_items(recent_feedback, limit=1),
-        "long_term_memory": _compress_memory_items(long_term_memory, limit=1),
-        "recent_log": [_clip_text(line) for line in match.get_public_log_lines(limit=min(2, recent_log_limit))],
-        "player_name": match.player.name,
-        "bot_name": match.bot.name,
-    }
-
-
 def build_decision_context(match, legal_actions):
     """
     행동과 카드 교체 판단에 필요한 최소 공개 문맥만 만든다.
@@ -121,29 +57,30 @@ def build_decision_context(match, legal_actions):
         legal_actions: 현재 턴 기준 허용 행동 목록이다.
 
     Returns:
-        공개 상태와 최근 공개 로그만 담은 context 사전이다.
+        공개 상태와 전체 공개 로그만 담은 context 사전이다.
     """
+
+    recent_log_lines = []
+    for line in match.get_public_log_lines():
+        recent_log_lines.append(" ".join(str(line or "").split()))
 
     return {
         "public_state": build_public_state_text(match, legal_actions),
         "recent_feedback": [],
         "long_term_memory": [],
-        "recent_log": [_clip_text(line) for line in match.get_public_log_lines(limit=2)],
+        "recent_log": recent_log_lines,
         "player_name": match.player.name,
         "bot_name": match.bot.name,
     }
 
 
-def build_action_task(match, legal_actions, recent_feedback, long_term_memory):
+def build_action_task(match, legal_actions):
     """
     현재 베팅 턴 행동을 고르게 할 작업을 만든다.
 
     Args:
         match: 현재 포커 매치 객체다.
         legal_actions: 현재 턴에 허용된 행동 목록이다.
-        recent_feedback: 단기 기억 목록이다.
-        long_term_memory: 장기 기억 목록이다.
-
     Returns:
         행동 선택용 `PokerAgentTask`다.
     """
@@ -154,21 +91,18 @@ def build_action_task(match, legal_actions, recent_feedback, long_term_memory):
         context=build_decision_context(match, legal_actions),
         metadata={
             "legal_actions": legal_actions,
-            "max_new_tokens": 48,
+            "max_new_tokens": 64,
         },
     )
 
 
-def build_draw_task(match, max_discards, recent_feedback, long_term_memory):
+def build_draw_task(match, max_discards):
     """
     카드 교체 인덱스를 판단하게 할 작업을 만든다.
 
     Args:
         match: 현재 포커 매치 객체다.
         max_discards: 이번 드로우에서 교체 가능한 최대 장수다.
-        recent_feedback: 단기 기억 목록이다.
-        long_term_memory: 장기 기억 목록이다.
-
     Returns:
         드로우 판단용 `PokerAgentTask`다.
     """
@@ -179,7 +113,7 @@ def build_draw_task(match, max_discards, recent_feedback, long_term_memory):
         context=build_decision_context(match, []),
         metadata={
             "max_discards": max_discards,
-            "max_new_tokens": 48,
+            "max_new_tokens": 64,
         },
     )
 
@@ -199,11 +133,11 @@ def build_dialogue_task(match, event_name, result_summary, recent_feedback, long
         대사 생성용 `PokerAgentTask`다.
     """
 
-    legal_actions = []
-    if match.phase in ("betting1", "betting2") and not match.round_over:
-        legal_actions = match._get_available_actions("bot")
+    recent_public_log = match.get_public_log_lines()
 
-    recent_public_log = match.get_public_log_lines(limit=2)
+    recent_log_lines = []
+    for line in recent_public_log:
+        recent_log_lines.append(" ".join(str(line or "").split()))
 
     return PokerAgentTask(
         mode="dialogue",
@@ -214,10 +148,17 @@ def build_dialogue_task(match, event_name, result_summary, recent_feedback, long
             player_name=match.player.name,
             bot_name=match.bot.name,
         ),
-        context=build_shared_context(match, legal_actions, recent_feedback, long_term_memory),
+        context={
+            "public_state": "",
+            "recent_feedback": [],
+            "long_term_memory": [],
+            "recent_log": recent_log_lines,
+            "player_name": match.player.name,
+            "bot_name": match.bot.name,
+        },
         metadata={
             "event_name": event_name,
-            "max_new_tokens": 64,
+            "max_new_tokens": 110,
         },
     )
 
@@ -237,14 +178,28 @@ def build_policy_task(round_summary, public_log, bot_name, recent_feedback, long
         정책 회고용 `PokerAgentTask`다.
     """
 
+    recent_feedback_texts = []
+    for item in recent_feedback or []:
+        text = item.get("text", "") if isinstance(item, dict) else item
+        recent_feedback_texts.append(" ".join(str(text or "").split()))
+
+    long_term_memory_texts = []
+    for item in long_term_memory or []:
+        text = item.get("text", "") if isinstance(item, dict) else item
+        long_term_memory_texts.append(" ".join(str(text or "").split()))
+
+    recent_log_lines = []
+    for line in public_log or []:
+        recent_log_lines.append(" ".join(str(line or "").split()))
+
     return PokerAgentTask(
         mode="policy",
         prompt=build_policy_feedback_prompt(),
         context={
             "round_summary": round_summary,
-            "recent_feedback": _compress_memory_items(recent_feedback, limit=1),
-            "long_term_memory": _compress_memory_items(long_term_memory, limit=1),
-            "recent_log": [_clip_text(line) for line in (public_log or [])[-2:]],
+            "recent_feedback": recent_feedback_texts,
+            "long_term_memory": long_term_memory_texts,
+            "recent_log": recent_log_lines,
             "public_state": "",
             "bot_name": bot_name,
         },

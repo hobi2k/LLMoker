@@ -66,7 +66,6 @@ class PokerMatch:
             config.llm_runtime_python,
             config.llm_device,
             memory_manager,
-            config.llm_runtime_port,
         )
         self.policy_loop = PolicyLoop(memory_manager, self.llm_agent)
         self.player = PlayerState(player_name, config.starting_stack)
@@ -214,7 +213,6 @@ class PokerMatch:
         match.llm_agent.reconfigure(
             llm_model_name=match.config.llm_model_name,
             llm_device=match.config.llm_device,
-            llm_runtime_port=match.config.llm_runtime_port,
         )
         match._apply_bot_mode_name()
         return match
@@ -705,8 +703,18 @@ class PokerMatch:
 
         if self.phase not in ("betting1", "betting2") or self.round_over or not self.is_player_turn():
             return ["지금은 그 행동을 할 수 없습니다."]
-        if action not in self._get_available_actions("player"):
+        available_actions = self._get_available_actions("player")
+        if action not in available_actions:
             return ["지금은 그 행동을 선택할 수 없습니다."]
+
+        if self.bot_mode == "llm_npc":
+            self._debug_terminal_log(
+                "플레이어 행동 선택 / 페이즈: %s / 선택: %s / 허용 행동: %s" % (
+                    self.phase_name_ko(),
+                    action,
+                    ", ".join(available_actions),
+                )
+            )
 
         messages = self._apply_betting_action("player", action)
         if not self.round_over:
@@ -859,8 +867,6 @@ class PokerMatch:
                     self.last_llm_reason,
                 )
                 self.action_log.append(llm_log)
-                self.public_log.append(llm_log)
-                messages.append(llm_log)
                 self._debug_terminal_log(
                     "%s 행동 선택 완료 / 선택: %s / 이유: %s / 상태: %s" % (
                         self.bot.name,

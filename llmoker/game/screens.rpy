@@ -22,6 +22,10 @@ transform llmoker_neon_breathe:
     linear 1.2 alpha 0.82
     repeat
 
+transform llmoker_menu_fade_in:
+    alpha 0.0
+    linear 0.28 alpha 1.0
+
 
 ################################################################################
 ## Styles
@@ -150,13 +154,13 @@ style namebox_label is say_label
 
 style window:
     xalign 0.5
-    xmaximum gui_scale(940)
+    xmaximum gui_scale(972)
     yalign 1.0
     ysize gui.textbox_height
     left_padding gui_scale(28)
     right_padding gui_scale(28)
-    top_padding gui_scale(12)
-    bottom_padding gui_scale(14)
+    top_padding gui_scale(14)
+    bottom_padding gui_scale(16)
     background "#06080dcf"
 
 style namebox:
@@ -361,18 +365,18 @@ style navigation_button_text is gui_button_text
 style navigation_button:
     size_group "navigation"
     properties gui.button_properties("navigation_button")
-    xminimum gui_scale(232)
-    left_padding gui_scale(22)
-    right_padding gui_scale(22)
-    top_padding gui_scale(12)
-    bottom_padding gui_scale(12)
-    background "#06101be4"
-    hover_background "#13243adf"
+    xminimum gui_scale(350)
+    left_padding gui_scale(34)
+    right_padding gui_scale(28)
+    top_padding gui_scale(18)
+    bottom_padding gui_scale(18)
+    background "#08121de6"
+    hover_background "#17293fe0"
 
 style navigation_button_text:
     properties gui.text_properties("navigation_button")
     font "fonts/malgunbd.ttf"
-    size gui_scale(25)
+    size gui_scale(35)
     color "#e7f3ff"
     hover_color "#ffffff"
     outlines [(1, "#071019", 0, 0)]
@@ -391,20 +395,24 @@ screen main_menu():
     on "show" action Function(play_main_menu_music)
 
     add "llmoker_main_menu_video" at llmoker_main_menu_video_fit
-    add Solid("#02030518")
+    add Solid("#02020601")
 
     ## This empty frame darkens the main menu.
     frame:
         style "main_menu_frame"
+        at llmoker_menu_fade_in
 
     ## The use statement includes another screen inside this one. The actual
     ## contents of the main menu are in the navigation screen.
-    use navigation
+    fixed:
+        at llmoker_menu_fade_in
+        use navigation
 
     if gui.show_name:
 
         fixed:
             style "main_menu_brand_panel"
+            at llmoker_menu_fade_in
 
             text "[config.name!t]":
                 style "main_menu_title_glow"
@@ -422,30 +430,30 @@ style main_menu_version is main_menu_text
 style main_menu_brand_panel is empty
 
 style main_menu_frame:
-    xsize gui_scale(318)
+    xsize gui_scale(390)
     yfill True
-    background "#040a14eb"
+    background "#040b149e"
 
 style main_menu_brand_panel:
-    xpos gui_scale(430)
-    ypos gui_scale(26)
-    xmaximum gui_scale(500)
-    ymaximum gui_scale(210)
+    xpos gui_scale(260)
+    ypos gui_scale(24)
+    xmaximum gui_scale(430)
+    ymaximum gui_scale(182)
 
 style main_menu_text:
     properties gui.text_properties("main_menu", accent=True)
 
 style main_menu_title:
     font "fonts/malgunbd.ttf"
-    size gui_scale(110)
+    size gui_scale(82)
     color "#fff7fb"
-    outlines [(2, "#260b15", 0, 0), (8, "#ff5fb85c", 0, 0)]
+    outlines [(2, "#2c0918", 0, 0), (6, "#ff67b463", 0, 0)]
 
 style main_menu_title_glow:
     font "fonts/malgunbd.ttf"
-    size gui_scale(110)
-    color "#ff4da8"
-    outlines [(14, "#ff4da899", 0, 0), (24, "#ff4da855", 0, 0), (36, "#ff4da822", 0, 0)]
+    size gui_scale(82)
+    color "#ff70c9"
+    outlines [(8, "#ff4bb6c8", 0, 0), (14, "#ff4bb68f", 0, 0), (20, "#ff4bb64e", 0, 0)]
 
 
 ## Game Menu screen ############################################################
