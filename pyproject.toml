@@ -8,10 +8,15 @@ dependencies = []
 
 [project.optional-dependencies]
 llm = [
-    "qwen-agent>=0.0.24",
+    "numpy>=1.26",
+    "pydantic>=2.12",
+    "pydantic-core>=2.41",
+    "python-dateutil>=2.9",
+    "qwen-agent>=0.0.34",
+    "soundfile>=0.12",
     "torch>=2.3",
     "torchaudio>=2.3",
-    "transformers==4.57.3",
+    "transformers>=5.3.0",
     "torchvision>=0.18",
 ]
 

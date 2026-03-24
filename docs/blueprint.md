@@ -4,10 +4,13 @@
 
 Ren'Py 런타임 구조와 `vendor/` 사용 이유는 [renpy_engine.md](docs/renpy_engine.md)에 별도로 정리한다.
 대사 이벤트 훅과 현재 LLM 대사 연결 구조는 [dialogue_system.md](docs/dialogue_system.md)에 별도로 정리한다.
-현재 LLM NPC 연결 방식과 `qwen3-4b-thinking` 모델 사용 구조는 [llm_npc_setup.md](docs/llm_npc_setup.md)에 별도로 정리한다.
+현재 LLM NPC 연결 방식과 `Qwen3-4B-Instruct-2507` 기본 모델 사용 구조는 [llm_npc_setup.md](docs/llm_npc_setup.md)에 별도로 정리한다.
+배포용 서빙 구조와 `vLLM`에서 `transformers`로 바꾼 이유는 [serving.md](docs/serving.md)에 별도로 정리한다.
 `Qwen-Agent` 레이어의 파일 역할과 폴더 구조 이유는 [qwen_agent.md](docs/qwen_agent.md)에 별도로 정리한다.
 ICRL을 `파인튜닝`이 아니라 `문맥 내 행동 정책 업데이트`로 해석하는 기준은 [icrl_policy_update.md](docs/icrl_policy_update.md)에 별도로 정리한다.
 코드 작성 스타일과 독스트링 기준은 [styleguide.md](docs/styleguide.md)에 별도로 정리한다.
+오디오 전환 규칙은 [audio.md](docs/audio.md)에 별도로 정리한다.
+QA, 구조 감사, 증상별 추적 경로는 [cookbook/README.md](cookbook/README.md)에 별도로 정리한다.
 LLM 의존성 관리는 루트 `requirements.txt`, 루트 `pyproject.toml`, `llmoker/pyproject.toml`에 같이 반영한다.
 
 LLMoker는 다음 요소를 결합하는 LLM 기반 게임 프로젝트다.
@@ -40,23 +43,37 @@ LLM NPC 설계의 핵심 제약은 아래와 같다.
 
 - Ren'Py 메인 메뉴와 공용 메뉴 한국어화
 - 메인 메뉴 배경 `game/gui/main.webm` 적용
+- 메인 메뉴는 왼쪽 네비게이션 레일과 별도 네온 타이틀 플레이트를 분리해 배치
 - 포커 기본 배경 `game/images/minigames/normal.webm` 적용
 - 라운드 종료 시 승패별 `win.webm`, `lost.webm` 배경 전환
+- 메인 메뉴 BGM `game/audio/main.flac` 적용
+- 포커 플레이 BGM `game/audio/game.flac` 적용
+- 프로그램 시작 로고 `game/gui/logo.webm` 적용
+- 프로그램 시작 인트로 `game/gui/intro_with_audio.webm` 적용
+- 인트로 뒤 오프닝 영상 `game/gui/openingcinema.webm` 적용
+- `game/script.rpy`의 `label splashscreen`이 프로그램 시작 직후 로고, 안내 문구, 인트로, 오프닝 시퀀스를 재생하는 동안 백그라운드 예열을 시작한다.
 - 위 `webm` 영상 자산은 `Wan 2.2` 기반 생성본을 사용
 - 현재 GUI 기준 해상도는 `1024x576`이며, 영상과 포커 UI를 같은 비율로 축소해 사용
+- 게임 화면의 대화창과 포커 하단 패널은 화면을 과하게 덮지 않되, 텍스트와 이름표가 답답하게 겹치지 않을 정도의 높이를 유지한다.
+- 카드 이미지는 화면 중앙 카드 패널에서 읽히도록 별도 크기로 유지하고, HUD는 카드 패널과 겹치지 않는 상단 정보 바로 분리한다.
+- 별도 서체 자산이 없을 때는 `malgun`/`malgunbd` 조합 안에서 본문과 강조 텍스트의 굵기를 나눠 화면을 정리한다.
+- 기본 `say` 대화창은 얇은 하단 패널과 위로 분리된 이름표 구조를 유지한다.
+- 메인 메뉴는 버전 문구나 슬로건보다 게임 제목 하나가 먼저 읽히도록 구성한다.
 - 정통 5드로우에 가까운 `체크 / 베팅 / 콜 / 레이즈 / 폴드 / 드로우` 흐름
 - 스크립트봇과 LLM NPC 전환 지원
 - LLM 행동 선택, 카드 교체, 대사 생성 연결
 - 라운드 종료 후 정책 피드백과 다음 전략 초점도 LLM이 생성
-- 위 네 흐름은 모두 `Qwen-Agent` tool calling으로 공개 상태와 기억을 조회하면서 처리
+- 위 네 흐름은 게임 레벨 태스크 네 가지로 분리해 유지한다
+- 공개 로그와 기억은 임의 길이 자르기 없이 전달하고, 대사 경로만 별도 사건 문장으로 다시 쓴다
+- `runtime.py`는 transformers로 모델을 직접 로드하고, 그 위에 `Qwen-Agent FnCallAgent`를 올려 행동/교체/대사/회고를 처리한다
 - 대사 이벤트 훅은 유지하되, `LLM NPC` 모드 실패를 스크립트 대사로 숨기지 않는다.
 - memory / replay / save SQLite 저장
 - 터미널 디버그 로그로 NPC 비공개 손패와 행동 판단 확인 가능
-- LLM NPC 경로는 `Qwen-Agent(local transformers)` 하나로 고정
-- Qwen-Agent 쪽 에이전트 타입은 `Assistant`로 유지
+- LLM NPC 배포 경로는 `transformers` 하나로 고정
 - 메인 메뉴에서 고를 수 있는 상대 AI는 `LLM NPC`와 `스크립트봇` 두 가지뿐이다
 - LLM NPC 실패 시 자동 폴백 없이 명시적 실패 상태를 유지한다
-- `qwen3-4b-thinking`는 사고 구간과 최종 응답을 분리해 사용하고, 행동/드로우/대사 해석은 `</think>` 뒤 최종 응답만 기준으로 한다.
+- 기본 런타임 모델은 `Qwen3-4B-Instruct-2507`이고, 행동/드로우/회고는 `Qwen-Agent + FnCallAgent` 경로, 대사도 같은 Qwen-Agent 경로를 유지한다.
+- 베팅 라운드에서는 콜 금액이 0이어도 `fold`, `check`, `bet`를 모두 선택할 수 있게 유지한다.
 - 로컬 모델 폴더 내부 파일은 수정하지 않는다.
 
 ## 2. 2026년 3월 19일 기준 폴더 구조
@@ -79,7 +96,6 @@ LLMoker/
     ├── 5Drawminigame.sh
     ├── 5Drawminigame.py
     ├── 5Drawminigame.exe
-    ├── main.py
     ├── pyproject.toml
     ├── README.md
     ├── log.txt
@@ -156,7 +172,6 @@ LLMoker/
     │   └── saves/
     ├── lib/
     ├── vendor/
-    ├── main.py
     ├── backend/
     │   ├── config.py
     │   ├── poker_engine.py
@@ -167,11 +182,11 @@ LLMoker/
     │   ├── save_state_store.py
     │   └── llm/
     │       ├── agent.py
+    │       ├── tasks.py
     │       ├── prompts.py
-    │       ├── results.py
     │       ├── tools.py
-    │       ├── worker_client.py
-    │       └── runtime_worker.py
+    │       ├── client.py
+    │       └── runtime.py
     └── pyproject.toml
 ```
 
@@ -186,14 +201,14 @@ LLMoker/
 - `vendor/`
   - Ren'Py 번들 파이썬에 기본 포함되지 않은 의존성을 넣는 폴더다. 현재는 SQLite 사용을 위해 `pysqlite3-binary`를 여기서 로드한다.
 - `models/llm/`
-  - 로컬 LLM 모델 폴더다. 현재 기본 대상 모델은 `qwen3-4b-thinking`다. 공식 소스는 `https://huggingface.co/Qwen/Qwen3-4B-Thinking-2507`이며, 다른 모델로 바꾸려면 `backend/config.py`의 기본 경로 또는 `LOCAL_LLM_PATH`를 수정한다.
+  - 로컬 LLM 모델 폴더다. 현재 기본 대상 모델은 `Qwen3-4B-Instruct-2507`다. 공식 소스는 `https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507`이며, 다른 모델로 바꾸려면 `backend/config.py`의 기본 경로 또는 `LOCAL_LLM_PATH`를 수정한다.
 - `backend/poker_hands.py`
   - 카드 표현, 덱 생성, 족보 평가처럼 포커 규칙 공용 로직을 분리한 파일이다.
 - `backend/script_bot.py`
   - LLM이 꺼져 있어도 완전한 한 판을 진행할 수 있는 규칙 기반 상대를 둔 파일이다.
 - `backend/llm/`
-  - Qwen-Agent 레이어를 모아 둔 폴더다.
-  - 여기서 `agent.py`는 엔진 어댑터, `prompts.py`는 프롬프트, `tools.py`는 tool calling 노출면, `worker_client.py`는 서버와 워커 관리, `runtime_worker.py`는 실제 워커 실행 진입점을 맡는다.
+  - LLM 런타임 레이어를 모아 둔 폴더다.
+  - 여기서 `agent.py`는 엔진 어댑터, `tasks.py`는 게임 레벨 태스크, `prompts.py`는 프롬프트, `client.py`는 Ren'Py 3.9와 Python 3.11 런타임 연결, `runtime.py`는 실제 transformers 모델 실행을 맡는다.
 - `scripts/`
   - 개발용 보조 스크립트만 둔다.
   - 현재는 `run_match.py`처럼 CLI 테스트용 파일만 여기에 둔다.
@@ -214,14 +229,15 @@ LLMoker/
 
 플레이 도중 필요한 정보와 라운드 종료 정보는 명확히 구분해야 한다.
 
-- 플레이 중 상시 HUD는 우상단에 `페이즈 / 팟 / 칩 현황 / 현재 족보`만 표시한다.
+- 플레이 중 상시 HUD는 화면 상단 중앙 정보 바에 `페이즈 / 팟 / 칩 현황 / 현재 족보 / 상태 문구`를 표시한다.
 - 베팅 라운드 UI는 현재 합법 행동만 버튼으로 노출한다.
-- 최근 진행 로그는 상시 패널로 띄우지 않고 하단 `로그 보기` 버튼으로만 확인한다.
+- 최근 진행 로그는 상시 패널로 띄우지 않고 우하단 `로그 보기` 버튼으로만 확인한다.
+- 게임 행동 버튼은 좌하단에 묶고, 저장/불러오기/로그 같은 유틸 버튼은 우하단에 따로 둔다.
 - 라운드 종료 화면에서는 플레이어와 상대의 손패 이미지를 동시에 공개한다.
-- 라운드 종료 화면의 카드 비교는 `상대 패 상단 / 플레이어 패 하단`의 세로 구조로 배치한다.
+- 라운드 종료 화면의 카드 비교는 `상대 패 상단 / 플레이어 패 하단`의 세로 구조로 배치하고, 결과 패널과 하단 도크를 분리한다.
 - 라운드 종료 화면에서는 `승리/패배/무승부`, `각자 족보`, `현재 스택`, `팟 획득 결과`를 한눈에 보여줘야 한다.
 - 다음 라운드가 가능한지, 아니면 한쪽 스택 부족으로 매치가 끝났는지도 종료 화면에 반드시 표시해야 한다.
-- 메인 메뉴 이동은 `screen Return()` 뒤의 `label return`에 의존하지 않고, `MainMenu` 액션이나 `jump main_menu`로 직접 처리한다.
+- 메인 메뉴 이동은 `screen Return()` 뒤의 `label return`에 의존하지 않고, `MainMenu` 액션이나 Ren'Py 내장 메뉴 라벨 경로로 직접 처리한다.
 - Ren'Py 스크립트에서는 `_`를 임시 변수명으로 사용하지 않는다. `_`는 번역 함수로 쓰이므로 덮어쓰면 `screens.rpy` 공용 UI가 깨질 수 있다.
 - 백엔드 예외 문자열을 Ren'Py `text`에 그대로 넣을 때는 `{}` 같은 태그 문자를 이스케이프해서 UI가 죽지 않게 한다.
 
@@ -230,8 +246,9 @@ LLMoker/
 - Ren'Py는 연출과 화면을 담당한다.
 - 포커 규칙 엔진은 진실의 원천이 된다.
 - LLM은 행동 제안만 하고, 최종 판정 권한은 엔진이 가진다.
-- `Qwen-Agent + local transformers` 레이어는 Ren'Py 본체와 분리된 프로세스 경계로 유지한다.
-- 이 분리는 단순 취향이 아니라, Ren'Py 런타임과 로컬 모델 의존성을 직접 섞지 않기 위한 선택이다.
+- `Qwen-Agent + transformers` 레이어는 Python 3.11 런타임에서 동작한다.
+- `Qwen-Agent`는 단순 부가물이 아니라 행동, 교체, 대사, 회고를 묶는 기본 오케스트레이션 계층이다.
+- Ren'Py 3.9와 `.venv` 3.11의 ABI 차이를 넘기기 위해 최소 런타임 프로세스를 둔다.
 - 대사 시스템은 라운드 이벤트 훅 기반으로 붙인다. `스크립트봇` 모드는 규칙 기반 대사를 쓰고, `LLM NPC` 모드는 실패를 그대로 노출한다.
 - 상대 AI는 메인 메뉴 `환경 설정`에서만 `스크립트봇`과 `LLM NPC` 사이를 전환할 수 있어야 한다.
 - 기본 상대 AI는 `LLM NPC`로 두고, 필요할 때만 `스크립트봇`으로 내릴 수 있게 한다.
@@ -240,7 +257,7 @@ LLMoker/
 
 지금 문서에서 가장 빠져 있던 부분이 이거다. `LLM을 붙인다`고만 하면 안 되고, 실제로 `모델 파일`, `백엔드 코드`, `학습 산출물`, `설정 파일`을 어디에 둘지 정해야 한다.
 
-현재 `llmoker/main.py`와 `llmoker/pyproject.toml`를 보면 백엔드 패키지는 아직 비어 있는 상태에 가깝다. 따라서 아래처럼 `llmoker/` 아래에 명시적으로 백엔드 영역을 만드는 편이 맞다.
+현재 프로젝트는 `llmoker/pyproject.toml`와 `backend/`를 중심으로 백엔드 경계를 유지한다. 따라서 아래처럼 `llmoker/` 아래에 명시적으로 백엔드 영역을 두는 편이 맞다.
 
 ### 4.1 권장 백엔드 구조
 
@@ -258,10 +275,11 @@ LLMoker/
     │   ├── replay_logger.py
     │   └── llm/
     │       ├── agent.py
+    │       ├── tasks.py
     │       ├── prompts.py
-    │       ├── results.py
     │       ├── tools.py
-    │       └── worker_client.py
+    │       ├── client.py
+    │       └── runtime.py
     ├── models/
     │   └── llm/
     ├── data/
@@ -275,8 +293,7 @@ LLMoker/
     │   ├── run_match.py
     │   ├── run_self_play.py
     │   └── eval_agent.py
-    ├── .env
-    └── main.py
+    └── .env
 ```
 
 ### 4.2 어떤 파일을 어디에 둬야 하는가
@@ -326,20 +343,22 @@ llmoker/models/llm/llama-3.1-8b-instruct/
 
 - 모델 가중치는 `llmoker/models/llm/` 아래에 둔다.
 - 추론 상위 로직은 `backend/llm/agent.py`에서 담당한다.
+- 게임 레벨 태스크는 `backend/llm/tasks.py`에서 담당한다.
 - 프롬프트 구성은 `backend/llm/prompts.py`에서 담당한다.
 - Qwen-Agent 도구 정의는 `backend/llm/tools.py`에서 담당한다.
-- 워커 프로세스 관리는 `backend/llm/worker_client.py`에서 담당한다.
-- 워커 실행 진입점은 `backend/llm/runtime_worker.py`에서 담당한다.
+- Ren'Py 프로세스와 Python 3.11 런타임 연결은 `backend/llm/client.py`에서 담당한다.
+- Qwen-Agent와 local transformers 직접 실행은 `backend/llm/runtime.py`에서 담당한다.
 - 메모리와 피드백 반영은 `backend/memory_manager.py`, `backend/policy_loop.py`에서 담당한다.
 - `backend/policy_loop.py`는 LLM 정책 리뷰 결과를 SQLite 메모리에 적재하는 경계 레이어다.
-- LLM 워커 파이썬은 기본적으로 `llmoker/.venv/bin/python`을 사용한다.
-- LLM NPC는 `Qwen-Agent + local transformers` 조합으로만 동작한다.
+- LLM NPC는 `Qwen-Agent + transformers + stdin/stdout IPC` 조합으로 동작한다.
 - Qwen-Agent에는 로컬 `transformers`에서 바로 먹는 샘플링 설정만 전달한다.
-- 워커는 모델을 직접 로드하고, 별도 모델 서버를 자동 기동하지 않는다.
+- 프로그램 시작 직후 `game/script.rpy`의 splashscreen에서 런타임 예열을 시작해, 미니게임 진입 뒤 첫 턴 지연을 줄인다.
+- Ren'Py 3.9와 `.venv` 3.11 ABI가 다르므로, 모델 실행은 Python 3.11 런타임 프로세스에서 수행한다.
 - 디바이스 힌트는 `auto`를 기본으로 두고, CUDA가 보일 때만 GPU를 사용한다.
 - 행동, 드로우, 대사, 정책 회고는 모두 tool calling 형식으로 `get_public_state`, `get_memory`, `get_recent_log`, `get_round_summary`를 조회할 수 있어야 한다.
+- 이 외부 런타임 구조는 나중에 TTS를 붙일 때도 확장 지점이 된다. 추후 `runtime.py`가 `voice_text`, `emotion`, `tts_payload` 같은 응답 필드를 추가하고, Ren'Py는 그 결과만 받아 오디오 계층으로 넘길 수 있다.
 - 게임 UI에서는 LLM 백엔드를 따로 고르지 않는다.
-- 로컬 워커가 기동하지 않거나 모델 로딩에 실패하면 LLM NPC는 실패 상태를 그대로 보여준다.
+- 로컬 Qwen 런타임이 기동하지 않거나 모델 로딩에 실패하면 LLM NPC는 실패 상태를 그대로 보여준다.
 - 같은 실패 설정으로는 매 턴 재기동을 반복하지 않는다.
 - 모델 원본은 수정하지 않는다.
 - 게임 런처 `./5Drawminigame.sh`는 모델이 없으면 공식 Hugging Face 저장소에서 자동 다운로드를 먼저 시도한다.
@@ -350,6 +369,8 @@ llmoker/models/llm/llama-3.1-8b-instruct/
 - 행동 선택 프롬프트: `build_action_prompt(...)`
 - 정책 피드백 프롬프트: `build_policy_feedback_prompt(...)`
 - 대사 생성 프롬프트: `build_dialogue_prompt(...)`
+  - 최근 로그를 날것으로 붙이지 않고 `상대가 체크했다`, `이제 드로우를 앞두고 있다` 같은 사건 문장으로 다시 써서 사용한다.
+  - `round_end`, `match_end`에서는 승패 결과를 바탕으로 기쁨/우쭐함/분함 같은 감정 힌트를 별도로 준다.
 
 현재 구현 상태는 아래와 같이 구분한다.
 
@@ -457,10 +478,7 @@ llmoker/data/prompts/dialogue/bluff_win.txt
 
 ```env
 LOCAL_LLM_PATH=./models/llm/qwen2.5-3b-instruct
-LLM_RUNNER_PYTHON=./.venv/bin/python
-LLM_MODEL_NAME=qwen3-4b-thinking
-LLM_MODEL_SERVER=http://127.0.0.1:8000/v1
-LLM_API_KEY=EMPTY
+LLM_MODEL_NAME=Qwen3-4B-Instruct-2507
 MEMORY_DB_PATH=./data/memory/memory.sqlite3
 REPLAY_DB_PATH=./data/replays/replays.sqlite3
 SAVE_DB_PATH=./data/save/game_state.sqlite3
@@ -582,7 +600,7 @@ def example(arg1, arg2):
 - 라운드 종료 화면에서는 플레이어 승리 시 `lost.webm`, NPC 승리 시 `win.webm`를 사용한다.
 - 영상은 원본을 직접 재인코딩하지 않아도 Ren'Py 표시 단계에서 1920x1080으로 맞춰 보여준다.
 - 게임 시작 시 검은 화면 없이 바로 `normal.webm` 배경으로 진입한다.
-- 승패가 정해지면 해당 `win/lost.webm` 배경 위에서 대사가 먼저 진행되고, 그 다음 결과 화면을 연다.
+- 승패가 정해지면 먼저 결과 화면을 띄워 승패 배경과 손패를 즉시 보여주고, 그 위에서 `round_end` 대사를 이어서 처리한다.
 - 게임 UI에는 상대 비공개 정보를 숨기고, 같은 내용은 터미널 디버그 로그에서만 확인한다.
 
 ### 5.7 현재 구현 규칙

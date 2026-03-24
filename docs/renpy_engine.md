@@ -10,7 +10,7 @@
 - 왜 시스템 Python이나 일반 `venv`에만 의존하면 안 되는가
 - `renpy/`, `lib/`, `game/`는 각각 무슨 역할을 하는가
 - `.venv`와 `vendor/`를 무엇에 나눠 써야 하는가
-- `backend/llm/runtime_worker.py`와 `scripts/run_match.py`는 각각 어디서 쓰는가
+- `backend/llm/client.py`, `backend/llm/runtime.py`, `scripts/run_match.py`는 각각 어디서 쓰는가
 
 ## 2. 핵심 결론
 
@@ -19,12 +19,20 @@
 즉 이 프로젝트는 보통의 구조처럼
 
 - 시스템 Python 실행
-- 루트 `.venv` 활성화
+- `llmoker/.venv` 활성화
 - 거기에 `pip install`
 
 만으로 끝나는 앱이 아니다.
 
 실제 게임은 `llmoker/lib/` 아래에 들어 있는 Ren'Py 번들 Python으로 실행된다.
+
+현재 UI는 `1024x576` 기준으로 유지하되, 메인 메뉴, 대화창, 포커 카드 패널, 결과 화면을 각각 독립 레이아웃으로 다룬다.
+카드 크기와 HUD 글자는 지나치게 작아지지 않도록 별도로 키우고, 현재 폰트 자산 안에서는 `malgunbd`를 인터페이스 강조 텍스트에 우선 써서 가독성을 높인다.
+메인 메뉴는 왼쪽 네비게이션 레일과 별도 네온 타이틀 플레이트를 분리해, 메뉴와 제목이 서로 겹치지 않도록 구성한다.
+메인 메뉴의 도움말, 정보, 환경 설정, 불러오기는 좌측 레일을 끌고 오지 않고 중앙 패널형 `game_menu`로 띄운다.
+기본 `say` 화면은 하단 대화 패널과 위로 분리된 이름표를 쓰되, 이름표가 본문을 침범하지 않도록 세로 간격을 확보한다.
+포커 화면은 상단 중앙 정보 바, 중앙 카드 패널, 좌하단 행동 도크, 우하단 시스템 도크를 분리한다.
+라운드 결과 화면은 `상대 패 상단 / 플레이어 패 하단`의 세로 구조로 유지하고, 하단 도크는 좌측 진행 버튼과 우측 시스템 버튼으로 나눈다.
 
 ## 3. 현재 구조에서 중요한 폴더
 
@@ -35,7 +43,6 @@ LLMoker/
     ├── renpy/
     ├── lib/
     ├── vendor/
-    ├── main.py
     ├── 5Drawminigame.sh
     └── 5Drawminigame.exe
 ```
@@ -88,7 +95,7 @@ Ren'Py 엔진 코드다.
 예를 들면 아래 설치는 게임 런타임에 바로 반영되지 않을 수 있다.
 
 - 시스템 `python3`에 `pip install`
-- 루트 `.venv`에 설치
+- `llmoker/` 바깥 다른 가상환경에 설치
 - 다른 개발용 가상환경에 설치
 
 이유는 간단하다.
@@ -127,7 +134,7 @@ llmoker/
 `LLMoker`에는 지금 파이썬 런타임이 두 개 있다.
 
 1. Ren'Py 본체 런타임
-2. LLM 워커용 `.venv`
+2. LLM 런타임용 `.venv`
 
 역할은 아래처럼 다르다.
 
@@ -138,17 +145,16 @@ llmoker/
   - `backend/save_state_store.py`
   - 세이브, 기억, 리플레이 관리
 - `.venv`
-  - `backend/llm/runtime_worker.py`
+  - `backend/llm/runtime.py`
   - `torch`
-  - `qwen-agent`
   - `transformers`
-  - Qwen-Agent와 로컬 모델 추론 처리
+  - 로컬 모델 추론 처리
 
-즉, SQLite는 현재 LLM 워커가 아니라 Ren'Py 본체가 직접 사용한다.
+즉, SQLite는 현재 LLM 런타임이 아니라 Ren'Py 본체가 직접 사용한다.
 
 그래서:
 
-- `torch`, `qwen-agent`, `transformers`는 `.venv` 설치가 맞다.
+- `torch`, `transformers`는 `.venv` 설치가 맞다.
 - `sqlite3` 대체 드라이버는 Ren'Py 본체가 읽을 수 있어야 하므로 `vendor/`가 맞다.
 
 `.venv`에 `pysqlite3`를 설치해도 Ren'Py 본체는 그 환경을 자동으로 보지 않는다.
@@ -180,7 +186,7 @@ llmoker/
 - RAG
 - 벡터 유사도 검색
 
-이 로직이 `backend/llm/runtime_worker.py`나 별도 백엔드 서비스에서만 돈다면 `sqlite-vec`는 `.venv`에 설치하는 편이 맞다.
+이 로직이 `backend/llm/runtime.py`나 별도 백엔드 서비스에서만 돈다면 `sqlite-vec`는 `.venv`에 설치하는 편이 맞다.
 
 현재 `LLMoker`는 두 번째 방향이 더 자연스럽다.
 
@@ -222,15 +228,63 @@ llmoker/
 
 ## 8. 현재 스크립트 파일의 역할
 
-현재 자주 헷갈리는 런타임 워커와 개발 스크립트는 역할이 다르다.
+현재 자주 헷갈리는 런타임 코드와 개발 스크립트는 역할이 다르다.
 
-- `backend/llm/runtime_worker.py`
+- `backend/llm/client.py`
   - 실제 게임에서 사용한다.
-  - `backend/llm/worker_client.py`가 서브프로세스로 실행한다.
-  - 행동 선택, 카드 교체, 대사 생성 요청을 JSON 라인 기반으로 처리한다.
+  - Ren'Py 3.9 프로세스에서 Python 3.11 런타임 프로세스를 관리한다.
+- `backend/llm/runtime.py`
+  - 실제 게임에서 사용한다.
+  - Python 3.11에서 `Qwen-Agent + transformers`를 직접 로드한다.
+  - 행동 선택, 카드 교체, 대사 생성, 라운드 회고 요청을 직접 처리한다.
 - `scripts/run_match.py`
   - 실제 Ren'Py 게임 런타임에서는 사용하지 않는다.
   - 개발자가 포커 엔진 규칙과 자동 대전을 빠르게 점검하는 CLI 테스트용 스크립트다.
+
+## 9. 자동 검증과 수동 QA를 분리하는 이유
+
+이 프로젝트는 Ren'Py 창이 실제로 떠야만 확인할 수 있는 문제와, 창 없이도 바로 잡을 수 있는 문제를 분리해서 봐야 한다.
+
+창 없이 잡을 수 있는 문제:
+
+- `.rpy` 문법 오류
+- Ren'Py lint 경고
+- Python 문법 오류
+- import 경로 붕괴
+
+창이 떠야 확인할 수 있는 문제:
+
+- 컷신 전환 감각
+- 버튼 배치와 카드 겹침
+- 대사 타이밍
+- 입력 체감
+
+현재 비GUI 검증 진입점은 아래 스크립트다.
+
+- `llmoker/scripts/check_game_non_gui.sh`
+
+이 스크립트는 순서대로:
+
+1. `./5Drawminigame.sh . compile`
+2. `./5Drawminigame.sh . lint`
+3. 핵심 백엔드 Python 파일 `py_compile`
+
+를 수행한다.
+
+즉 이 스크립트가 통과해도 “게임이 예쁘다”는 뜻은 아니지만, 최소한 Ren'Py 문법과 주요 파이썬 문법이 깨졌는지는 바로 확인할 수 있다.
+
+반대로 실제 플레이 QA는 별도로 해야 한다.
+
+수동 GUI QA에서 봐야 하는 핵심:
+
+- `logo -> 안내 문구 -> intro -> openingcinema -> main menu` 전환감
+- 메인 메뉴 패널, 타이틀, 글자 크기
+- 서브 메뉴가 메인 레일과 겹치지 않고 중앙 패널로 뜨는지
+- 하단 행동 버튼과 우하단 유틸 버튼 충돌 여부
+- 결과 화면 패널 높이와 카드 잘림 여부
+- 대사 품질과 지연
+
+현재는 `game/script.rpy`의 `label splashscreen`이 프로그램 시작 직후 인트로와 오프닝 영상을 재생하는 동안 `begin_llm_npc_prewarm()`으로 외부 런타임 예열을 시작하고, `label start`는 그 결과를 이어받는다. `poker_minigame.rpy`는 이미 준비된 런타임을 재사용한다.
 
 즉, 배포 단위에 매우 가깝다.
 
@@ -243,7 +297,7 @@ llmoker/
 이 프로젝트에서는 Ren'Py 런타임과 관련된 의존성은 아래 원칙을 따른다.
 
 - Ren'Py 본체가 직접 import하는 런타임 의존성은 `llmoker/vendor/`에 포함한다.
-- LLM 워커가 직접 import하는 추론 의존성은 `llmoker/.venv/`에 설치한다.
+- Python 3.11 런타임이 직접 import하는 추론 의존성은 `llmoker/.venv/`에 설치한다.
 - `game/`에서는 런타임 경로만 연결하고, 실제 드라이버 선택은 `backend/` 공용 모듈에서 처리한다.
 - 시스템 Python 설치 여부에 기대지 않는다.
 - 배포 가능한 상태를 유지하는 방향으로 의존성을 관리한다.

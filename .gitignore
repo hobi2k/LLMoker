@@ -218,9 +218,13 @@ __marimo__/
 # LLMoker runtime
 llmoker/game/cache/
 llmoker/game/saves/
+llmoker/log.txt
+llmoker/traceback.txt
 llmoker/game/*.rpyc
 llmoker/log.txt
 llmoker/traceback.txt
+!llmoker/lib/
+!llmoker/lib/**
 llmoker/models/llm/
 llmoker/data/replays/*.jsonl
 llmoker/data/memory/**/*.jsonl
