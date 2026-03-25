@@ -4,6 +4,10 @@
 
 Ren'Py 기반 5드로우 포커 게임에 로컬 LLM NPC, 행동/단계 시스템 나레이션, LLM 기반 정책 회고를 결합한 프로젝트입니다.
 
+## 시연 영상
+
+- [LLMoker 시연 영상](https://drive.google.com/file/d/1W17GbiPAAmPyYkO118DcvA2SpW7rMHmU/view?usp=sharing)
+
 ## 현재 구현 상태
 
 - 2인 5드로우 포커 규칙 구현
