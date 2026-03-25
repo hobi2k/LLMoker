@@ -8,7 +8,7 @@
 
 정리하면:
 
-- `Qwen-Agent`가 행동, 카드 교체, 대사, 회고의 오케스트레이션 중심이다.
+- `Qwen-Agent`가 행동과 카드 교체의 오케스트레이션 중심이다.
 - `transformers`가 실제 로컬 모델 추론을 맡는다.
 - Ren'Py 3.9와 Python 3.11 `.venv`를 잇기 위해 IPC 런타임을 쓴다.
 
@@ -29,11 +29,14 @@
   - IPC 자식 프로세스 기동/종료/요청 전송
 - `runtime.py`
   - 모델 로드, Qwen-Agent `FnCallAgent`, 결과 파싱
-  - 행동/교체/회고와 대사를 같은 Qwen-Agent 기반 런타임에서 처리하되, 대사만 별도 시스템 메시지와 짧은 사건 문맥을 쓴다.
+  - 행동/교체/회고는 tool calling 경로를 쓴다.
+  - 회고는 자유문장 3개를 바로 뽑지 않고, 정책 슬롯 JSON을 먼저 고른 뒤 코드가 전략 문장으로 바꾼다.
 - `tools.py`
   - `get_public_state`, `get_memory`, `get_recent_log`, `get_round_summary`
 - `tasks.py`
-  - 행동/교체/대사/회고 태스크 payload 조립
+  - 행동/교체 태스크 payload 조립
+  - 행동/교체 태스크에 최근 전략 피드백과 장기 기억을 함께 넣는다.
+  - 회고 태스크에는 이번 라운드의 확정 사실과 행동 사실만 넣는다.
 - `prompts.py`
   - 작업 prompt 조립
 
@@ -60,13 +63,15 @@
 6. `llmoker/backend/llm/client.py`
 7. `llmoker/backend/llm/runtime.py`
 
-## 5. 대사 경로 메모
+## 5. 현재 화면 출력 메모
 
-현재 대사 생성은 별도 raw completion 우회 경로가 아니라 `Qwen-Agent` 기반 경로를 유지한다.
+현재 빌드에서는 LLM 대사를 사용하지 않는다.
 
-- `agent.py`의 `generate_dialogue()`가 `build_dialogue_task()`를 호출한다.
-- `tasks.py`는 최근 공개 로그를 그대로 붙이지 않고, 대사용 사건 문맥과 감정 힌트를 조립한다.
-- `prompts.py`는 `상대에게 지금 바로 던지는 말` 중심의 프롬프트를 만든다.
-- `runtime.py`는 `dialogue_agent`에 사야의 말투, 직접 화법, 금지 표현만 고정한 시스템 메시지를 준다.
-
-즉 현재 대사 품질은 `Qwen-Agent를 뺀다/넣는다`보다, 대사용 사건 요약과 감정 힌트를 얼마나 잘 주느냐에 더 크게 좌우된다.
+- `poker_dialogue.rpy`는 행동 요약과 단계 나레이션만 출력한다.
+- 게임 화면의 문장은 `플레이어는 체크했다`, `사야는 10칩 베팅했다`처럼 시스템 설명으로 통일한다.
+- 정책 회고는 `policy_loop.py`가 공개 로그와 라운드 결과를 LLM 회고 입력으로 넘겨 생성한다.
+- 정책 회고는 라운드 종료 뒤 한 번만 생성한다.
+- `policy_loop.py`는 회고 결과가 승패, 족보, 폴드 종료 여부와 충돌하면 저장하지 않는다.
+- 베팅이 없는 상태에서는 `fold`를 합법 행동으로 주지 않는다.
+- 즉 Qwen 런타임은 행동, 카드 교체, 회고를 처리한다.
+- 행동과 카드 교체는 저장된 회고를 읽어 다음 판단에 반영한다.

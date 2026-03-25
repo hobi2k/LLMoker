@@ -67,12 +67,12 @@
 
 - `_escape_renpy_say_text()`
   - Ren'Py 치환 문자 이스케이프
-- `_dialogue_event_lines()`
-  - 스크립트 대사 생성
-- `_llm_dialogue_lines()`
-  - LLM 대사 생성
+- `_action_summary_lines()`
+  - 행동 로그를 화면용 나레이션으로 정리
+- `_event_narration_lines()`
+  - 단계/결과 시스템 나레이션 생성
 - `play_dialogue_event()`
-  - 실제 대사 출력
+  - 실제 나레이션 출력
 
 ## 2. 포커 엔진
 
@@ -160,7 +160,6 @@
 - `stop()`
 - `choose_action()`
 - `choose_discards()`
-- `generate_dialogue()`
 - `generate_policy_feedback()`
 
 ### `llmoker/backend/llm/client.py`
@@ -177,8 +176,6 @@
 
 - `preview_text()`
 - `looks_like_meta_response()`
-- `extract_dialogue_text()`
-- `normalize_dialogue_text()`
 - `normalize_reason_text()`
 - `extract_json_payload()`
 - `extract_action_payload()`
@@ -186,7 +183,6 @@
 
 #### 시스템 메시지
 
-- `build_dialogue_system_message()`
 - `build_decision_system_message()`
 - `build_policy_system_message()`
 
@@ -206,11 +202,8 @@
 ### `llmoker/backend/llm/prompts.py`
 
 - `build_public_state_text()`
-- `_latest_public_event_text()`
-- `_dialogue_event_context_text()`
 - `build_action_prompt()`
 - `build_draw_prompt()`
-- `build_dialogue_prompt()`
 - `build_policy_feedback_prompt()`
 
 ### `llmoker/backend/llm/tasks.py`
@@ -220,7 +213,6 @@
   - 행동과 카드 교체가 쓰는 공개 상태 중심 결정용 문맥 생성기
 - `build_action_task()`
 - `build_draw_task()`
-- `build_dialogue_task()`
 - `build_policy_task()`
 
 ### `llmoker/backend/llm/tools.py`

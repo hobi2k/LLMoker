@@ -6,7 +6,7 @@
 핵심은 `Qwen-Agent가 지금의 기반`이라는 점이다.  
 이 장은 “에이전트를 얹는” 구조가 아니라, 에이전트 중심으로 어떻게 판단이 조립되는지 보는 장이다.
 
-정리하면, `transformers`는 실제 추론 엔진이고 `Qwen-Agent`는 행동, 카드 교체, 대사, 회고를 한 흐름으로 묶는 기본 오케스트레이션 계층이다.
+정리하면, `transformers`는 실제 추론 엔진이고 `Qwen-Agent`는 행동, 카드 교체, 회고를 묶는 기본 오케스트레이션 계층이다.
 
 ## 1. 전체 구조
 
@@ -21,15 +21,23 @@
 
 실제 흐름:
 
-1. 엔진이 “행동/카드 교체/대사/회고가 필요하다”고 판단한다.
+1. 엔진이 “행동/카드 교체/회고가 필요하다”고 판단한다.
 2. `LocalLLMAgent`가 현재 상황을 task로 만든다.
 3. `QwenRuntimeClient`가 외부 Python 3.11 런타임에 요청한다.
 4. `runtime.py`가 `Qwen-Agent + transformers`로 결과를 만든다.
-5. 결과를 다시 엔진이 검증하고 적용한다.
+5. 라운드 종료 뒤 `policy_loop.py`가 공개 로그와 종료 결과를 바탕으로 LLM 회고를 한 번만 요청한다.
+6. 결과를 다시 엔진이 검증하고 적용한다.
+
+검증 스크립트:
+
+- `llmoker/scripts/verify_llm_policy_simulation.py`
+  - 실제 포커 엔진과 실제 Qwen 런타임으로 3판 이상을 자동 진행한다.
+  - 라운드 종료 전에는 `latest_feedback`가 비어 있어야 하고, 라운드 종료 뒤에만 회고가 생기는지 확인한다.
+  - 회고 문장이 승패, 종료 방식, 족보와 충돌하지 않는지도 함께 본다.
 
 중요한 점:
 
-- 이 런타임은 첫 대사 요청 때 늦게 띄우지 않는다.
+- 이 런타임은 첫 행동 판단 때 늦게 띄우지 않는다.
 - `game/script.rpy`의 `label splashscreen`이 인트로와 오프닝 시퀀스를 재생하는 동안 백그라운드 예열을 시작한다.
 - `label start`는 그 예열 결과를 이어받고, `poker_minigame`에 들어간 뒤에는 이미 떠 있는 런타임을 재사용하는 구조다.
 
@@ -82,7 +90,7 @@
 
 의미:
 
-프로그램 시작 직후 스플래시 시퀀스 동안 런타임을 미리 올려 두고, 첫 대사나 첫 행동에서 느껴지는 지연을 줄이기 위해 사용된다.
+프로그램 시작 직후 스플래시 시퀀스 동안 런타임을 미리 올려 두고, 첫 행동에서 느껴지는 지연을 줄이기 위해 사용된다.
 
 ### `choose_action(match, legal_actions)`
 
@@ -124,41 +132,6 @@
 - 중복이 없는지
 - 최대 교체 장수를 넘지 않는지
 
-### `generate_dialogue(match, event_name, result_summary=None)`
-
-기능:
-
-- 현재 이벤트에 맞는 심리전 대사를 생성한다.
-
-입력:
-
-- 매치
-- 이벤트 이름
-- 종료 요약 문자열
-
-출력:
-
-- `{status, text, reason}`
-
-대사 품질이 이상할 때는 이 함수 하나만 보면 안 된다.  
-반드시 `build_dialogue_task()`, `build_dialogue_prompt()`, `runtime.py`의 dialogue 시스템 메시지를 같이 봐야 한다.
-
-### `generate_policy_feedback(round_summary, public_log, bot_name)`
-
-기능:
-
-- 라운드 회고를 요청한다.
-
-입력:
-
-- 라운드 요약
-- 공개 로그
-- 봇 이름
-
-출력:
-
-- `{status, short_term, long_term, strategy_focus}`
-
 ## 3. `tasks.py`
 
 이 파일은 **무슨 정보를 런타임으로 넘길지 결정하는 층**이다.  
@@ -195,8 +168,8 @@
 
 중요:
 
-- 행동과 카드 교체는 최근 기억을 직접 섞지 않는다.
-- 공개 상태와 공개 로그만 넘겨, 회고 문장이나 장기 메모가 현재 판단을 오염시키지 않게 한다.
+- 행동과 카드 교체는 최근 전략 피드백과 장기 기억을 함께 읽는다.
+- 다만 전체 메모리를 다 넣지 않고, 최근 단기 몇 개와 장기 몇 개만 제한해서 넣는다.
 - 현재 활성 경로에서 행동과 카드 교체는 이 컨텍스트를 공통으로 사용한다.
 
 ### `build_action_task(...)`
@@ -235,35 +208,11 @@
 - 여기 입력이 잘못되면 포커 외 다른 게임 용어가 튀는 경우가 많다.
 - 내부적으로 `build_decision_context()`를 사용한다.
 - 현재 출력 상한은 `64` 토큰이다.
-
-### `build_dialogue_task(...)`
-
-기능:
-
-- 대사 생성용 task 생성
-
-중요:
-
-- 여기서 최근 공개 사건을 어떻게 요약하느냐가 대사 품질을 크게 좌우한다.
-- 로그를 날것으로 넘기면 프롬프트 복제형 대사가 나오기 쉽다.
-- `round_end`, `match_end`는 `round_summary`를 읽고 감정 힌트를 따로 만든다.
-- 현재 출력 상한은 `80` 토큰이다.
-
-### `build_policy_task(...)`
-
-기능:
-
-- 회고 생성용 task 생성
-
-중요:
-
-- 회고 품질이 나쁘면 기억이 오염된다.
-- 현재 출력 상한은 `384` 토큰이다.
+- `build_draw_prompt()`에 족보별 교체 규칙(원페어: 페어 2장 유지, 나머지에서 버림 등)이 없으면 모델이 페어 카드를 버리는 잘못된 선택을 한다.
 
 ## 4. `prompts.py`
 
-이 파일은 실제 문장을 만든다.  
-대사 품질이 낮으면 가장 먼저 이 파일을 의심해야 한다.
+이 파일은 실제 판단 프롬프트 문장을 만든다.
 
 ### `build_public_state_text(match, legal_actions)`
 
@@ -303,46 +252,29 @@
 - 최대 장수
 - JSON 출력 형식
 
-### `build_dialogue_prompt(...)`
-
-기능:
-
-- 현재 사건에 맞는 대사 생성 지시문 생성
-
-입력:
-
-- 이벤트 이름
-- 최근 공개 로그
-- 결과 요약
-- 플레이어/봇 이름
-
-출력:
-
-- 대사 프롬프트 문자열
-
-현재 기준 핵심:
-
-- 프롬프트는 `상대에게 지금 바로 한마디 던진다`는 직접 화법 중심이다.
-- `방금 상황은 ...`, `지금 감정이나 목표는 ...` 정도만 짧게 준다.
-- `블라인드`, `턴`, `라이브` 같은 설명투 표현을 금지한다.
-- 대사 품질 문제를 후처리보다 입력 문맥 축소와 사건 재서술로 해결하려는 경로다.
-
-가장 자주 흔들리는 지점:
-
-- 프롬프트 문장을 모델이 그대로 비틀어 말함
-- 장면 설명을 대사처럼 따라 함
-- 없는 게임 용어를 지어냄
+현재 빌드에서는 대사 생성 프롬프트를 쓰지 않는다.
+게임 화면 문장은 `poker_dialogue.rpy`의 시스템 나레이션이 담당한다.
 
 ### `build_policy_feedback_prompt()`
 
 기능:
 
-- 회고와 전략 초점 생성을 요청
+- 회고를 위한 정책 슬롯을 요청
 
 출력 형식:
 
-- `short_term`
-- `long_term`
+- `result`
+- `ending`
+- `pressure`
+- `bot_hand_bucket`
+- `adjustment`
+- `strategy_focus`
+
+중요:
+
+- Qwen은 자유 문장 3개를 직접 쓰지 않는다.
+- 먼저 위 슬롯만 고르고, `runtime.py`가 그것을 `short_term`, `long_term`, `strategy_focus` 문장으로 변환한다.
+- 이 구조 덕분에 4B 모델이 사실을 틀리게 섞을 여지가 줄어든다.
 - `strategy_focus`
 
 ## 5. `tools.py`
@@ -432,8 +364,6 @@
 
 - `preview_text()`
 - `looks_like_meta_response()`
-- `extract_dialogue_text()`
-- `normalize_dialogue_text()`
 - `normalize_reason_text()`
 - `extract_action_payload()`
 - `extract_draw_payload()`
@@ -451,13 +381,11 @@
 
 중요 함수:
 
-- `build_dialogue_system_message()`
 - `build_decision_system_message()`
 - `build_policy_system_message()`
 
 원칙:
 
-- dialogue: 캐릭터성과 대화 스타일
 - decision: 합법성과 판단 형식
 - policy: 회고 목적
 
@@ -481,6 +409,12 @@
 
 - Qwen-Agent가 읽는 메시지 시퀀스
 
+주의 — `_postprocess_messages` 오버라이드:
+
+- qwen-agent 0.0.34는 텍스트에서 function_call을 파싱해 Message를 만들 때 `extra=None`을 만들 수 있다.
+- 런타임은 메시지 순회와 선택 결과 파싱 단계에서 `None`과 `extra=None`을 먼저 방어해야 한다.
+- 현재 대사 경로는 직접 생성이다. 이벤트별 상황, 최근 실제 행동, 직전 대사 흐름을 프롬프트에 넣고 `run_chat()`으로 대사를 만든다.
+
 ### `QwenRuntime`
 
 역할:
@@ -497,6 +431,10 @@
 출력:
 
 - `{status: ok|error, ...}`
+
+주의:
+
+- `load_model()`에서 `decision_agent`, `policy_agent`를 초기화해야 한다.
 
 ### `serve_ipc(runtime)`
 

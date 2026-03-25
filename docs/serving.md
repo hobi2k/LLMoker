@@ -44,7 +44,8 @@ Steam 같은 일반 유저 배포 기준에서는 `vLLM`보다 `transformers`가
    - 요청은 `stdin`, 응답은 `stdout`으로 주고받는다.
 3. `llmoker/backend/llm/runtime.py`
    - `transformers`로 토크나이저와 모델을 직접 로드한다.
-   - 그 위에 `Qwen-Agent FnCallAgent`를 올려 tool calling 기반으로 행동, 교체, 대사, 회고를 처리한다.
+   - 그 위에 `Qwen-Agent FnCallAgent`를 올려 행동, 교체, 회고는 tool calling으로 처리한다.
+   - 대사는 이벤트별 상황, 최근 실제 행동, 직전 대사 흐름을 프롬프트에 넣고 직접 생성한다.
    - 준비가 끝나면 한 줄 JSON으로 ready 상태를 내보낸다.
    - 이후 한 줄 JSON 요청을 읽어 바로 결과를 돌려준다.
 4. `llmoker/backend/llm/agent.py`
