@@ -5,25 +5,19 @@ from __future__ import annotations
 import argparse
 import copy
 import json
+import random
 import re
 import sys
 import traceback
 from pathlib import Path
 
 import torch
-import yaml
 from qwen_agent.agents import FnCallAgent
 from qwen_agent.llm.function_calling import BaseFnCallModel
 from qwen_agent.llm.schema import Message
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from backend.llm.tools import (
-    build_dialogue_select_tools,
-    build_poker_tools,
-    clear_tool_context,
-    get_and_clear_selected_dialogue_index,
-    set_tool_context,
-)
+from backend.llm.tools import build_poker_tools, clear_tool_context, set_tool_context
 
 
 def error_reason(reason, fallback="알 수 없는 오류가 발생했습니다."):
@@ -145,29 +139,6 @@ def looks_like_meta_response(text):
     return False
 
 
-def extract_dialogue_text(text):
-    """
-    모델 출력 앞에 붙은 형식용 접두를 걷어내고 대사만 남긴다.
-
-    Args:
-        text: 모델이 반환한 최종 문자열이다.
-
-    Returns:
-        실제 대사 부분만 남긴 문자열이다.
-    """
-
-    clean_text = (text or "").strip()
-    if not clean_text:
-        return ""
-
-    prefixes = ("대사:", "최종 대사:", "NPC:", "사야:")
-    for prefix in prefixes:
-        if clean_text.startswith(prefix):
-            clean_text = clean_text[len(prefix) :].strip()
-            break
-    return strip_wrapping_quotes(clean_text)
-
-
 def strip_action_or_reason_prefix(text, legal_actions=None):
     """
     이유 문자열 앞의 형식 토큰을 제거한다.
@@ -192,31 +163,6 @@ def strip_action_or_reason_prefix(text, legal_actions=None):
     return strip_wrapping_quotes(clean_text)
 
 
-def normalize_dialogue_text(text):
-    """
-    모델 출력에서 실제 게임 대사 줄만 남긴다.
-
-    Args:
-        text: 모델이 반환한 문자열이다.
-
-    Returns:
-        게임에 넣을 수 있는 한두 줄 대사다.
-    """
-
-    clean_text = extract_dialogue_text(text)
-    if not clean_text:
-        return ""
-
-    lines = []
-    for line in clean_text.splitlines():
-        stripped = line.strip()
-        stripped = strip_wrapping_quotes(stripped)
-        if not stripped or looks_like_meta_response(stripped):
-            continue
-        lines.append(stripped)
-    return "\n".join(lines[:2]).strip()
-
-
 def normalize_reason_text(text, fallback, legal_actions=None):
     """
     모델 reason 필드를 짧은 한국어 한 문장으로 정리한다.
@@ -230,12 +176,42 @@ def normalize_reason_text(text, fallback, legal_actions=None):
         로그와 UI에 바로 쓸 수 있는 이유 문자열이다.
     """
 
-    clean_text = strip_action_or_reason_prefix(extract_dialogue_text(text), legal_actions=legal_actions)
+    clean_text = strip_action_or_reason_prefix(strip_wrapping_quotes(text), legal_actions=legal_actions)
     clean_text = re.sub(r"^\s*\[[0-4](?:\s*,\s*[0-4])*\]\s*(?:를|을)?\s*", "", clean_text)
     clean_text = strip_wrapping_quotes(clean_text)
     if not clean_text or looks_like_meta_response(clean_text):
         return fallback
     return clean_text
+
+
+def normalize_policy_role_terms(text):
+    """
+    정책 회고 문장에서 흔들리는 주체 표기를 self/opponent로 정규화한다.
+
+    Args:
+        text: 원본 회고 문장이다.
+
+    Returns:
+        self/opponent 용어로 정리된 문자열이다.
+    """
+
+    normalized = " ".join(str(text or "").split())
+    replacements = (
+        ("상대방", "opponent"),
+        ("플레이어", "opponent"),
+        ("상대", "opponent"),
+        ("사야", "self"),
+        ("나는", "self는"),
+        ("난", "self는"),
+        ("내가", "self가"),
+        ("내", "self"),
+        ("저는", "self는"),
+        ("제가", "self가"),
+        ("저", "self"),
+    )
+    for old, new in replacements:
+        normalized = normalized.replace(old, new)
+    return normalized
 
 
 def extract_json_payload(text):
@@ -331,97 +307,6 @@ def extract_draw_payload(text):
     return {"discard_indexes": indexes, "reason": clean_text}
 
 
-_DIALOGUE_LINES_PATH = Path(__file__).resolve().parents[1] / "dialogue_lines.yaml"
-_DIALOGUE_LINES_CACHE = None
-
-
-def load_dialogue_lines():
-    """
-    대사 풀 YAML 파일을 읽어 dialogue_key → 대사 목록 사전으로 돌려준다.
-    한 번 로드하면 모듈 수준 캐시에 보관해 중복 IO를 막는다.
-
-    Returns:
-        dialogue_key를 키로 하고 대사 문자열 목록을 값으로 하는 사전이다.
-        파일을 읽지 못하면 빈 사전을 반환한다.
-    """
-
-    global _DIALOGUE_LINES_CACHE
-    if _DIALOGUE_LINES_CACHE is not None:
-        return _DIALOGUE_LINES_CACHE
-    try:
-        with open(_DIALOGUE_LINES_PATH, encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-        _DIALOGUE_LINES_CACHE = {
-            k: [str(line) for line in v]
-            for k, v in (data or {}).items()
-            if isinstance(v, list)
-        }
-    except Exception as exc:
-        trace_runtime("dialogue_lines.load_failed", reason=str(exc))
-        _DIALOGUE_LINES_CACHE = {}
-    return _DIALOGUE_LINES_CACHE
-
-
-def build_dialogue_select_system_message():
-    """
-    대사 번호 선택 전용 시스템 지시를 만든다.
-    LLM이 select_dialogue_line 도구를 반드시 사용하도록 지시한다.
-
-    Returns:
-        대사 선택 전용 시스템 문자열이다.
-    """
-
-    return "\n".join(
-        [
-            "너는 5드로우 포커 테이블의 캐릭터 사야다.",
-            "상황 설명을 읽고 가장 어울리는 대사 번호를 select_dialogue_line 도구로 선택한다.",
-            "도구 호출 외에 다른 텍스트를 출력하지 않는다.",
-        ]
-    )
-
-
-def build_dialogue_system_message():
-    """
-    사야 대사 생성에만 쓰는 고정 시스템 지시를 만든다.
-
-    Returns:
-        캐릭터성, 말투, 출력 제약만 담은 시스템 문자열이다.
-    """
-
-    examples = "\n".join([
-        "올바른 대사 예시 (상대 행동과 심리만 언급):",
-        "  [판 시작] '첫 판부터 작아 보이네.' / '눈빛이 달라졌어?' / '쉽게 끝나겠는데.'",
-        "  [체크] '겁난 거야?' / '그게 최선이야?' / '재미없게 왜 그래.'",
-        "  [베팅] '그거면 되겠어?' / '나한테 그 금액으로?' / '어디 한번 보자.'",
-        "  [드로우] '손이 떨리네?' / '몇 장 버릴지는 이미 보이는데.' / '바꿔도 소용없어.'",
-        "  [승리] '역시 그렇지.' / '애쓰지 마.' / '다음도 똑같아.'",
-        "  [패배] '운이 좋았네.' / '이번 한 번이야.' / '다음 판 봐.'",
-        "잘못된 대사 예시 (절대 쓰지 말 것):",
-        "  '카드가 떨어졌어?' — 카드 표현 금지",
-        "  '뭘 떨어뜨릴지 보여줄까?' — 카드 표현 금지",
-        "  '내 카드가 뭔지 보여줄까?' — 정보 제안 금지",
-        "  '너의 패가 뭔지 알아서...' — 정보 요청 금지",
-        "  '또 그렇게 빠르게 내려오나 봐.' — 카드 표현 금지",
-    ])
-    return "\n".join(
-        [
-            "너는 5드로우 포커 테이블에 앉은 캐릭터 사야다.",
-            "사야는 냉정하고 날카롭다. 여유 있게 상대를 압박하되 과장하지 않는다.",
-            "짧은 반말로 자연스럽게 말한다. 번역투, 과한 감탄사 없이 실제 대화처럼 말한다.",
-            "",
-            "대사의 핵심 규칙:",
-            "1. 상대의 행동(체크, 베팅, 콜, 폴드)이나 태도만 언급한다.",
-            "2. 카드, 패, 드로우, 손패는 절대 대사 소재로 쓰지 않는다.",
-            "3. '보여주다', '떨어지다', '내려오다', '나오다'를 카드와 함께 쓰지 않는다.",
-            "4. 정보를 요청하거나 내 패를 공개하겠다는 말을 하지 않는다.",
-            "5. 한 문장, 짧게, 눈앞 상대에게 직접 던지는 말로만 끝낸다.",
-            "6. 독백, 상황 설명, 해설은 하지 않는다.",
-            "",
-            examples,
-        ]
-    )
-
-
 def build_decision_system_message():
     """
     행동과 카드 교체 판단에 공통으로 쓰는 시스템 지시를 만든다.
@@ -454,7 +339,11 @@ def build_policy_system_message():
         [
             "너는 2인 5드로우 포커 NPC의 회고 모듈이다.",
             "도구로 방금 끝난 라운드의 공개 정보만 확인한 뒤 다음 판 메모를 만든다.",
-            "비공개 손패를 단정하지 않는다.",
+            "용어 규칙: self는 사야, opponent는 플레이어다.",
+            "당신, 나, 상대방 같은 흔들리는 호칭을 쓰지 않는다.",
+            "self와 opponent를 절대 바꾸지 않는다.",
+            "승자, 족보, 팟, 폴드 종료 여부를 틀리면 안 된다.",
+            "비공개 손패를 단정하거나 공개 사실에 없는 결과를 지어내지 않는다.",
             "최종 JSON만 출력한다.",
         ]
     )
@@ -685,10 +574,7 @@ class QwenRuntime:
         self.device = None
         self.chat_model = None
         self.tool_list = build_poker_tools()
-        self.dialogue_lines = {}
         self.decision_agent = None
-        self.dialogue_agent = None
-        self.dialogue_select_agent = None
         self.policy_agent = None
 
     def resolve_device(self):
@@ -744,17 +630,6 @@ class QwenRuntime:
             function_list=self.tool_list,
             llm=self.chat_model,
             system_message=build_decision_system_message(),
-        )
-        self.dialogue_agent = FnCallAgent(
-            function_list=self.tool_list,
-            llm=self.chat_model,
-            system_message=build_dialogue_system_message(),
-        )
-        self.dialogue_lines = load_dialogue_lines()
-        self.dialogue_select_agent = FnCallAgent(
-            function_list=build_dialogue_select_tools(),
-            llm=self.chat_model,
-            system_message=build_dialogue_select_system_message(),
         )
         self.policy_agent = FnCallAgent(
             function_list=self.tool_list,
@@ -959,114 +834,6 @@ class QwenRuntime:
             "reason": reason_text,
         }
 
-    def _extract_selected_line(self, messages, lines):
-        """
-        에이전트 응답 메시지 목록에서 select_dialogue_line 도구 호출 인자를 찾아 대사를 반환한다.
-
-        Args:
-            messages: run_agent가 반환한 전체 메시지 목록이다.
-            lines: 현재 상황의 대사 문자열 목록이다.
-
-        Returns:
-            선택된 대사 문자열 또는 None이다.
-        """
-
-        for message in (messages or []):
-            if message is None:
-                continue
-            fc = message.get("function_call") if isinstance(message, dict) else getattr(message, "function_call", None)
-            if fc is None:
-                continue
-            name = fc.get("name") if isinstance(fc, dict) else getattr(fc, "name", None)
-            if name != "select_dialogue_line":
-                continue
-            raw_args = fc.get("arguments") if isinstance(fc, dict) else getattr(fc, "arguments", "{}")
-            try:
-                args = json.loads(raw_args) if isinstance(raw_args, str) else (raw_args or {})
-                index = int(args.get("index", -1))
-                if 0 <= index < len(lines):
-                    return lines[index]
-            except (json.JSONDecodeError, TypeError, ValueError):
-                pass
-        return None
-
-    def handle_dialogue(self, payload):
-        """
-        대사 풀에서 현재 상황에 맞는 대사를 tool calling으로 선택한다.
-        LLM은 select_dialogue_line 도구로 번호만 선택하고 실제 텍스트는 YAML에서 가져온다.
-
-        Args:
-            payload: 대사 태스크 요청 사전이다.
-
-        Returns:
-            대사 결과 사전이다.
-        """
-
-        dialogue_key = payload.get("dialogue_key", "")
-        lines = self.dialogue_lines.get(dialogue_key, [])
-        event_name = payload.get("event_name", dialogue_key)
-
-        if not lines:
-            trace_runtime("dialogue.no_lines", dialogue_key=dialogue_key)
-            return {"status": "error", "reason": "대사 풀에서 '%s' 항목을 찾지 못했습니다." % dialogue_key}
-
-        lines_text = "\n".join("%d. %s" % (i, line) for i, line in enumerate(lines))
-        situation = payload.get("situation", "현재 포커 판이 진행 중이다.")
-        prompt = "\n".join([
-            "상황: %s" % situation,
-            "",
-            "선택 가능한 대사:",
-            lines_text,
-            "",
-            "select_dialogue_line 도구로 가장 어울리는 번호를 선택하라.",
-        ])
-
-        context = dict(payload.get("context", {}) or {})
-        context["dialogue_lines"] = lines
-        context["event_name"] = event_name
-
-        _, messages = self.run_agent(
-            self.dialogue_select_agent,
-            prompt,
-            context,
-            {
-                "max_new_tokens": 32,
-                "temperature": 0.1,
-                "top_p": 0.9,
-            },
-        )
-
-        # 도구가 호출됐으면 SelectDialogueLineTool이 인덱스를 저장해 둔다
-        saved_index = get_and_clear_selected_dialogue_index()
-        if saved_index is not None and 0 <= saved_index < len(lines):
-            selected = lines[saved_index]
-            trace_runtime("dialogue.selected", dialogue_key=dialogue_key, preview=preview_text(selected))
-            return {"status": "ok", "text": selected}
-
-        # 메시지에서 function_call을 직접 파싱 시도
-        selected = self._extract_selected_line(messages, lines)
-        if selected:
-            trace_runtime("dialogue.selected_from_msg", dialogue_key=dialogue_key, preview=preview_text(selected))
-            return {"status": "ok", "text": selected}
-
-        # 텍스트에서 숫자 추출 최후 시도
-        output_text = ""
-        if messages:
-            last = messages[-1]
-            output_text = last.get("content") if isinstance(last, dict) else getattr(last, "content", "")
-        try:
-            m = re.search(r"\b([0-6])\b", str(output_text or ""))
-            if m:
-                index = int(m.group(1))
-                if 0 <= index < len(lines):
-                    trace_runtime("dialogue.fallback_parse", index=index, dialogue_key=dialogue_key)
-                    return {"status": "ok", "text": lines[index]}
-        except (ValueError, TypeError):
-            pass
-
-        trace_runtime("dialogue.tool_call_failed_fallback", dialogue_key=dialogue_key)
-        return {"status": "ok", "text": lines[0]}
-
     def handle_policy(self, payload):
         """
         라운드 회고 요청을 실행하고 JSON 메모로 정리한다.
@@ -1083,9 +850,9 @@ class QwenRuntime:
             payload["prompt"],
             payload.get("context", {}),
             {
-                "max_new_tokens": payload.get("max_new_tokens", 384),
-                "temperature": 0.15,
-                "top_p": 0.75,
+                "max_new_tokens": payload.get("max_new_tokens", 256),
+                "temperature": 0.0,
+                "top_p": 0.8,
             },
         )
         feedback_payload = extract_json_payload(output_text)
@@ -1096,11 +863,38 @@ class QwenRuntime:
             )
             return {"status": "error", "reason": "Qwen-Agent 응답에서 라운드 회고 JSON을 찾지 못했습니다. 출력 미리보기: %s" % preview_text(output_text)}
 
+        required_keys = {"short_term", "long_term", "strategy_focus"}
+        if not required_keys.issubset(feedback_payload.keys()):
+            trace_runtime("policy.invalid_fields", preview=preview_text(output_text))
+            return {"status": "error", "reason": "Qwen-Agent 정책 회고 필드가 부족합니다."}
+        short_term = normalize_policy_role_terms(normalize_reason_text(
+            feedback_payload.get("short_term", ""),
+            "이번 판 회고를 자연스럽게 정리하지 못했습니다.",
+        ))
+        long_term = normalize_policy_role_terms(normalize_reason_text(
+            feedback_payload.get("long_term", ""),
+            "다음 판 전략을 자연스럽게 정리하지 못했습니다.",
+        ))
+        strategy_focus = " ".join(str(feedback_payload.get("strategy_focus", "") or "").split())[:18] or "상대 행동 패턴"
+        if short_term and "self" not in short_term:
+            short_term = "self는 " + short_term.lstrip()
+        if long_term and "self" not in long_term:
+            long_term = "self는 " + long_term.lstrip()
+
+        if any(term in short_term for term in ("당신", "상대방")):
+            return {"status": "error", "reason": "정책 회고 short_term이 역할 용어 규칙을 지키지 않았습니다."}
+        if any(term in long_term for term in ("당신", "상대방")):
+            return {"status": "error", "reason": "정책 회고 long_term이 역할 용어 규칙을 지키지 않았습니다."}
+        if "self" not in short_term:
+            return {"status": "error", "reason": "정책 회고 short_term에 self 주체가 드러나야 합니다."}
+        if "self" not in long_term:
+            return {"status": "error", "reason": "정책 회고 long_term에 self 주체가 드러나야 합니다."}
+
         return {
             "status": "ok",
-            "short_term": str(feedback_payload.get("short_term", "") or "").strip(),
-            "long_term": str(feedback_payload.get("long_term", "") or "").strip(),
-            "strategy_focus": str(feedback_payload.get("strategy_focus", "") or "").strip(),
+            "short_term": short_term,
+            "long_term": long_term,
+            "strategy_focus": strategy_focus,
         }
 
     def handle_chat(self, payload):
@@ -1154,8 +948,6 @@ class QwenRuntime:
             return self.handle_action(payload)
         if mode == "draw":
             return self.handle_draw(payload)
-        if mode == "dialogue":
-            return self.handle_dialogue(payload)
         if mode == "policy":
             return self.handle_policy(payload)
         if mode == "chat":

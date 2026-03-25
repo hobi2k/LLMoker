@@ -1,9 +1,9 @@
-2026-03-25 07:26:22 UTC
+2026-03-25 16:21:31 UTC
 Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39
 Ren'Py 8.2.1.24030407
 
 Early init took 0.02s
-Loading error handling took 0.01s
+Loading error handling took 0.02s
 Loading script took 0.04s
 Loading save slot metadata took 0.01s
 Loading persistent took 0.00s
@@ -20,7 +20,7 @@ Initial gc took 0.02s
 DPI scale factor: 1.000000
 Creating interface object took 0.00s
 Cleaning stores took 0.00s
-Init translation took 0.02s
+Init translation took 0.01s
 Build styles took 0.00s
 Load screen analysis took 0.01s
 Analyze screens took 0.00s
@@ -42,62 +42,71 @@ Display Info: None
 Screen sizes: virtual=(1024, 576) physical=(1024, 576) drawable=(1024, 576)
 Could not open 'cache/shaders.txt':
 Maximum texture size: 4096x4096
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: match_intro / 내용: 시작부터 긴장한 거야? 재밌네.
-[LLMoker][DEBUG] 라운드 1 시작 / 사야 시작 손패: 스페이드 Ace, 하트 4, 클로버 6, 스페이드 4, 클로버 2 (원페어)
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: round_start / 내용: 이번 판도 내 페이스야.
-[LLMoker][DEBUG] 플레이어 행동 선택 / 페이즈: 첫 번째 베팅 / 선택: check / 허용 행동: fold, check, bet
+[LLMoker][DEBUG] 라운드 1 시작 / 사야 시작 손패: 다이아 8, 다이아 4, 다이아 5, 다이아 10, 다이아 3 (플러시)
+[LLMoker][DEBUG] 플레이어 행동 선택 / 페이즈: 첫 번째 베팅 / 선택: check / 허용 행동: check, bet
+[LLMoker][DEBUG] 행동 적용 / 주체: 당신 / 행동: check / 팟: 10칩 / 현재 베팅: 0칩 / 플레이어 기여: 0칩 / 사야 기여: 0칩 / 콜 금액(플레이어): 0칩 / 콜 금액(사야): 0칩 / 다음 차례: 사야
 [LLMoker][DEBUG] 턴 전환 / 다음 차례: 사야 / 현재 페이즈: 첫 번째 베팅
-[LLMoker][DEBUG] 사야 행동 판단 시작 / 페이즈: 첫 번째 베팅 / 손패: 스페이드 Ace, 하트 4, 클로버 6, 스페이드 4, 클로버 2 (원페어) / 허용 행동: fold, check, bet
-[LLMoker][DEBUG] 사야 행동 선택 완료 / 선택: bet / 이유: 현재 베팅액이 0칩이고 팟이 10칩인 상태에서 원페어를 가진 내 손패로 베팅을 진행합니다. / 상태: Qwen 런타임 요청 성공
+[LLMoker][DEBUG] 사야 행동 판단 시작 / 페이즈: 첫 번째 베팅 / 손패: 다이아 8, 다이아 4, 다이아 5, 다이아 10, 다이아 3 (플러시) / 허용 행동: check, bet / 최근 전략: 0 / 장기 기억: 0
+[LLMoker][DEBUG] 사야 행동 선택 완료 / 선택: bet / 이유: 현재 베팅액이 0칩이고 콜 금액도 0칩이므로 첫 번째 베팅을 하며, 플러시 족보를 가진 손패로 강한 포지션을 점유한다. / 상태: Qwen 런타임 요청 성공
+[LLMoker][DEBUG] 행동 적용 / 주체: 사야 / 행동: bet / 팟: 20칩 / 현재 베팅: 10칩 / 플레이어 기여: 0칩 / 사야 기여: 10칩 / 콜 금액(플레이어): 10칩 / 콜 금액(사야): 0칩 / 다음 차례: 플레이어
 [LLMoker][DEBUG] 턴 전환 / 다음 차례: 플레이어 / 현재 페이즈: 첫 번째 베팅
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: betting / 내용: 그 베팅이 맞는 판단인지 두고 봐.
+[LLMoker][DEBUG] 플레이어 행동 선택 / 페이즈: 첫 번째 베팅 / 선택: fold / 허용 행동: fold, call, raise
+[LLMoker][DEBUG] 행동 적용 / 주체: 당신 / 행동: fold / 팟: 20칩 / 현재 베팅: 10칩 / 플레이어 기여: 0칩 / 사야 기여: 10칩 / 콜 금액(플레이어): 10칩 / 콜 금액(사야): 0칩 / 다음 차례: 플레이어
+[LLMoker][DEBUG] 폴드 종료 / 승자: 사야 / 팟: 20칩 / 사야 손패: 다이아 8, 다이아 4, 다이아 5, 다이아 10, 다이아 3 (플러시)
+[LLMoker][TRACE][POLICY] llm_feedback_start / hand_no=1 / bot_name=사야 / public_log_count=4
+[LLMoker][TRACE][POLICY] llm_feedback_rejected / hand_no=1 / reason=폴드 종료인데 쇼다운으로 서술했습니다. / short_term=self는 쇼다운에서 플러시로 승리했습니다. opponent은 첫 번째 베팅 후 폴드했습니다. / long_term=self는 다음 판에 opponent의 체크 후 베팅을 했을 때 패의 강도를 더 정확히 판단하여 콜을 강화합니다. / strategy_focus=상대 체크 후 베팅
+[LLMoker][DEBUG] 사야 정책 피드백 실패 / 단기: 정책 피드백 생성 실패: 폴드 종료인데 쇼다운으로 서술했습니다. / 장기: 정책 피드백 생성이 실패해 이번 라운드 회고를 저장하지 못했다. / 초점: 회고 검증 규칙 점검
+[LLMoker][DEBUG] 라운드 2 시작 / 사야 시작 손패: 하트 Ace, 스페이드 Jack, 클로버 5, 하트 10, 다이아 4 (하이카드)
+[LLMoker][DEBUG] 플레이어 행동 선택 / 페이즈: 첫 번째 베팅 / 선택: check / 허용 행동: check, bet
+[LLMoker][DEBUG] 행동 적용 / 주체: 당신 / 행동: check / 팟: 10칩 / 현재 베팅: 0칩 / 플레이어 기여: 0칩 / 사야 기여: 0칩 / 콜 금액(플레이어): 0칩 / 콜 금액(사야): 0칩 / 다음 차례: 사야
+[LLMoker][DEBUG] 턴 전환 / 다음 차례: 사야 / 현재 페이즈: 첫 번째 베팅
+[LLMoker][DEBUG] 사야 행동 판단 시작 / 페이즈: 첫 번째 베팅 / 손패: 하트 Ace, 스페이드 Jack, 클로버 5, 하트 10, 다이아 4 (하이카드) / 허용 행동: check, bet / 최근 전략: 0 / 장기 기억: 0
+[LLMoker][DEBUG] 사야 행동 선택 완료 / 선택: check / 이유: 현재 베팅액이 0칩이고 콜 금액도 0칩이므로 체크를 선택하며, 하이카드 손패를 유지한 상태에서 리스크를 최소화합니다. / 상태: Qwen 런타임 요청 성공
+[LLMoker][DEBUG] 페이즈 전환 / 다음 페이즈: 드로우 / 사유: 첫 번째 베팅 종료
+[LLMoker][DEBUG] 행동 적용 / 주체: 사야 / 행동: check / 팟: 10칩 / 현재 베팅: 0칩 / 플레이어 기여: 0칩 / 사야 기여: 0칩 / 콜 금액(플레이어): 0칩 / 콜 금액(사야): 0칩 / 다음 차례: 플레이어
+[LLMoker][DEBUG] 턴 전환 / 다음 차례: 플레이어 / 현재 페이즈: 드로우
+[LLMoker][DEBUG] 사야 카드 교체 판단 시작 / 현재 손패: 하트 Ace, 스페이드 Jack, 클로버 5, 하트 10, 다이아 4 (하이카드) / 최근 전략: 0 / 장기 기억: 0
+[LLMoker][DEBUG] 사야 카드 교체 선택 완료 / 버릴 인덱스: [0, 2] / 이유: 스페이드 잭과 클로버 5를 버리고 하트 에이스와 하트 테이블을 유지해 하이카드를 강화한다. / 상태: Qwen 런타임 요청 성공
+[LLMoker][DEBUG] 사야 드로우 후 손패: 하트 Queen, 스페이드 Jack, 스페이드 9, 하트 10, 다이아 4 (하이카드)
+[LLMoker][DEBUG] 플레이어 행동 선택 / 페이즈: 두 번째 베팅 / 선택: check / 허용 행동: check, bet
+[LLMoker][DEBUG] 행동 적용 / 주체: 당신 / 행동: check / 팟: 10칩 / 현재 베팅: 0칩 / 플레이어 기여: 0칩 / 사야 기여: 0칩 / 콜 금액(플레이어): 0칩 / 콜 금액(사야): 0칩 / 다음 차례: 사야
+[LLMoker][DEBUG] 턴 전환 / 다음 차례: 사야 / 현재 페이즈: 두 번째 베팅
+[LLMoker][DEBUG] 사야 행동 판단 시작 / 페이즈: 두 번째 베팅 / 손패: 하트 Queen, 스페이드 Jack, 스페이드 9, 하트 10, 다이아 4 (하이카드) / 허용 행동: check, bet / 최근 전략: 0 / 장기 기억: 0
+[LLMoker][DEBUG] 사야 행동 선택 완료 / 선택: bet / 이유: 현재 베팅액이 0칩이고 콜 금액도 0칩이므로, 하이카드 족보를 가진 상황에서 베팅하여 리스크를 관리한다. / 상태: Qwen 런타임 요청 성공
+[LLMoker][DEBUG] 행동 적용 / 주체: 사야 / 행동: bet / 팟: 20칩 / 현재 베팅: 10칩 / 플레이어 기여: 0칩 / 사야 기여: 10칩 / 콜 금액(플레이어): 10칩 / 콜 금액(사야): 0칩 / 다음 차례: 플레이어
+[LLMoker][DEBUG] 턴 전환 / 다음 차례: 플레이어 / 현재 페이즈: 두 번째 베팅
+[LLMoker][DEBUG] 플레이어 행동 선택 / 페이즈: 두 번째 베팅 / 선택: fold / 허용 행동: fold, call, raise
+[LLMoker][DEBUG] 행동 적용 / 주체: 당신 / 행동: fold / 팟: 20칩 / 현재 베팅: 10칩 / 플레이어 기여: 0칩 / 사야 기여: 10칩 / 콜 금액(플레이어): 10칩 / 콜 금액(사야): 0칩 / 다음 차례: 플레이어
+[LLMoker][DEBUG] 폴드 종료 / 승자: 사야 / 팟: 20칩 / 사야 손패: 하트 Queen, 스페이드 Jack, 스페이드 9, 하트 10, 다이아 4 (하이카드)
+[LLMoker][TRACE][POLICY] llm_feedback_start / hand_no=2 / bot_name=사야 / public_log_count=9
+[LLMoker][DEBUG] 사야 정책 피드백 완료 / 단기: self는 두 번째 베팅으로 opponent를 폴드시켰다. / 장기: self는 다음 판에 두 번째 베팅 후 opponent의 반응을 더 신중히 분석한다. / 초점: 상대 두 번째 베팅
+[LLMoker][DEBUG] 라운드 3 시작 / 사야 시작 손패: 다이아 King, 하트 6, 스페이드 3, 클로버 Queen, 하트 5 (하이카드)
+[LLMoker][DEBUG] 플레이어 행동 선택 / 페이즈: 첫 번째 베팅 / 선택: check / 허용 행동: check, bet
+[LLMoker][DEBUG] 행동 적용 / 주체: 당신 / 행동: check / 팟: 10칩 / 현재 베팅: 0칩 / 플레이어 기여: 0칩 / 사야 기여: 0칩 / 콜 금액(플레이어): 0칩 / 콜 금액(사야): 0칩 / 다음 차례: 사야
+[LLMoker][DEBUG] 턴 전환 / 다음 차례: 사야 / 현재 페이즈: 첫 번째 베팅
+[LLMoker][DEBUG] 사야 행동 판단 시작 / 페이즈: 첫 번째 베팅 / 손패: 다이아 King, 하트 6, 스페이드 3, 클로버 Queen, 하트 5 (하이카드) / 허용 행동: check, bet / 최근 전략: 1 / 장기 기억: 1
+[LLMoker][DEBUG] 사야 행동 선택 완료 / 선택: bet / 이유: 현재 베팅액이 0칩이고 팟이 10칩이므로, 자신의 하이카드 손패로 베팅하여 opponent의 반응을 신중히 분석한다. / 상태: Qwen 런타임 요청 성공
+[LLMoker][DEBUG] 행동 적용 / 주체: 사야 / 행동: bet / 팟: 20칩 / 현재 베팅: 10칩 / 플레이어 기여: 0칩 / 사야 기여: 10칩 / 콜 금액(플레이어): 10칩 / 콜 금액(사야): 0칩 / 다음 차례: 플레이어
+[LLMoker][DEBUG] 턴 전환 / 다음 차례: 플레이어 / 현재 페이즈: 첫 번째 베팅
 [LLMoker][DEBUG] 플레이어 행동 선택 / 페이즈: 첫 번째 베팅 / 선택: call / 허용 행동: fold, call, raise
 [LLMoker][DEBUG] 페이즈 전환 / 다음 페이즈: 드로우 / 사유: 첫 번째 베팅 종료
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: betting / 내용: 다음이 기대되네.
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: draw / 내용: 뭘 바꿀지 이미 알아.
-[LLMoker][DEBUG] 사야 카드 교체 판단 시작 / 현재 손패: 스페이드 Ace, 하트 4, 클로버 6, 스페이드 4, 클로버 2 (원페어)
-[LLMoker][DEBUG] 사야 카드 교체 선택 완료 / 버릴 인덱스: [0, 2] / 이유: 스페이드 아이스와 클로버 6을 버리고 하트 4와 스페이드 4의 원페어를 유지한다. / 상태: Qwen 런타임 요청 성공
-[LLMoker][DEBUG] 사야 드로우 후 손패: 하트 Ace, 하트 4, 하트 9, 스페이드 4, 클로버 2 (원페어)
-[LLMoker][DEBUG] 플레이어 행동 선택 / 페이즈: 두 번째 베팅 / 선택: check / 허용 행동: fold, check, bet
+[LLMoker][DEBUG] 행동 적용 / 주체: 당신 / 행동: call / 팟: 30칩 / 현재 베팅: 10칩 / 플레이어 기여: 10칩 / 사야 기여: 10칩 / 콜 금액(플레이어): 0칩 / 콜 금액(사야): 0칩 / 다음 차례: 플레이어
+[LLMoker][DEBUG] 사야 카드 교체 판단 시작 / 현재 손패: 다이아 King, 하트 6, 스페이드 3, 클로버 Queen, 하트 5 (하이카드) / 최근 전략: 1 / 장기 기억: 1
+[LLMoker][DEBUG] 사야 카드 교체 선택 완료 / 버릴 인덱스: [1, 3] / 이유: 인덱스 1(하트 6)과 인덱스 3(클로버 Queen)을 교체한다.  
+reason: 최근 전략 피드백에서 opponent이 두 번째 베팅 후 폴드했음을 고려하여, 더 강한 족보로 전환하려는 전략을 유지한다. 하이카드에서 투페어 또는 원페어로 올라가기 위해 하트 6과 클로버 Queen을 교체하여 족보를 강화한다. / 상태: Qwen 런타임 요청 성공
+[LLMoker][DEBUG] 사야 드로우 후 손패: 다이아 King, 다이아 3, 스페이드 3, 다이아 Queen, 하트 5 (원페어)
+[LLMoker][DEBUG] 플레이어 행동 선택 / 페이즈: 두 번째 베팅 / 선택: bet / 허용 행동: check, bet
+[LLMoker][DEBUG] 행동 적용 / 주체: 당신 / 행동: bet / 팟: 40칩 / 현재 베팅: 10칩 / 플레이어 기여: 10칩 / 사야 기여: 0칩 / 콜 금액(플레이어): 0칩 / 콜 금액(사야): 10칩 / 다음 차례: 사야
 [LLMoker][DEBUG] 턴 전환 / 다음 차례: 사야 / 현재 페이즈: 두 번째 베팅
-[LLMoker][DEBUG] 사야 행동 판단 시작 / 페이즈: 두 번째 베팅 / 손패: 하트 Ace, 하트 4, 하트 9, 스페이드 4, 클로버 2 (원페어) / 허용 행동: fold, check, bet
-[LLMoker][DEBUG] 사야 행동 선택 완료 / 선택: bet / 이유: 현재 베팅액이 0칩이고 콜 금액이 0칩이므로, 팟이 30칩인 상황에서 원페어를 가진 내 손패로 베팅하여 경쟁을 유도한다. / 상태: Qwen 런타임 요청 성공
+[LLMoker][DEBUG] 사야 행동 판단 시작 / 페이즈: 두 번째 베팅 / 손패: 다이아 King, 다이아 3, 스페이드 3, 다이아 Queen, 하트 5 (원페어) / 허용 행동: fold, call, raise / 최근 전략: 1 / 장기 기억: 1
+[LLMoker][DEBUG] 사야 행동 선택 완료 / 선택: raise / 이유: 현재 베팅액은 10칩이며, 콜 금액도 10칩이므로 자신의 스택(95칩)과 비교해도 여유가 있어, 최근 전략 피드백에 따라 opponent의 반응을 신중히 분석한 후 높은 베팅으로 반격한다. / 상태: Qwen 런타임 요청 성공
+[LLMoker][DEBUG] 행동 적용 / 주체: 사야 / 행동: raise / 팟: 60칩 / 현재 베팅: 20칩 / 플레이어 기여: 10칩 / 사야 기여: 20칩 / 콜 금액(플레이어): 10칩 / 콜 금액(사야): 0칩 / 다음 차례: 플레이어
 [LLMoker][DEBUG] 턴 전환 / 다음 차례: 플레이어 / 현재 페이즈: 두 번째 베팅
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: betting / 내용: 그 베팅이 맞는 판단인지 두고 봐.
 [LLMoker][DEBUG] 플레이어 행동 선택 / 페이즈: 두 번째 베팅 / 선택: call / 허용 행동: fold, call, raise
 [LLMoker][DEBUG] 페이즈 전환 / 다음 페이즈: 쇼다운 / 사유: 두 번째 베팅 종료
-[LLMoker][DEBUG] 쇼다운 / 플레이어: 다이아 7, 클로버 Jack, 다이아 4, 하트 3, 클로버 4 (원페어) / 사야: 하트 Ace, 하트 4, 하트 9, 스페이드 4, 클로버 2 (원페어)
-[LLMoker][TRACE][POLICY] llm_feedback_start / hand_no=1 / bot_name=사야 / public_log_count=10
-[LLMoker][DEBUG] 사야 정책 피드백 완료 / 단기: 내가 원페어로 승리하며 팟 50칩을 획득, 상대와 동일한 족보를 가졌지만 베팅 리드를 통해 우위를 점했다. / 장기: 동일한 족보일 경우 베팅 리드를 통해 리스크를 줄이는 전략을 유지한다. / 초점: 다음 라운드의 베팅 행동
-[LLMoker][DEBUG] 쇼다운 결과 / 승자: 사야 / 팟: 50칩
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: round_end / 내용: 수고했어. 잘 졌어.
-[LLMoker][DEBUG] 라운드 2 시작 / 사야 시작 손패: 다이아 2, 클로버 8, 다이아 9, 클로버 3, 클로버 Queen (하이카드)
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: round_start / 내용: 얼마나 버틸지 두고 보자.
-[LLMoker][DEBUG] 플레이어 행동 선택 / 페이즈: 첫 번째 베팅 / 선택: check / 허용 행동: fold, check, bet
-[LLMoker][DEBUG] 턴 전환 / 다음 차례: 사야 / 현재 페이즈: 첫 번째 베팅
-[LLMoker][DEBUG] 사야 행동 판단 시작 / 페이즈: 첫 번째 베팅 / 손패: 다이아 2, 클로버 8, 다이아 9, 클로버 3, 클로버 Queen (하이카드) / 허용 행동: fold, check, bet
-[LLMoker][DEBUG] 사야 행동 선택 완료 / 선택: bet / 이유: 현재 베팅액이 0칩이고 팟이 10칩이므로, 하이카드 족보를 가진 내 손패로 10칩을 베팅하여 리드를 확보한다. / 상태: Qwen 런타임 요청 성공
-[LLMoker][DEBUG] 턴 전환 / 다음 차례: 플레이어 / 현재 페이즈: 첫 번째 베팅
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: betting / 내용: 그 베팅이 맞는 판단인지 두고 봐.
-[LLMoker][DEBUG] 플레이어 행동 선택 / 페이즈: 첫 번째 베팅 / 선택: call / 허용 행동: fold, call, raise
-[LLMoker][DEBUG] 페이즈 전환 / 다음 페이즈: 드로우 / 사유: 첫 번째 베팅 종료
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: betting / 내용: 다음이 기대되네.
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: draw / 내용: 뭘 바꿀지 이미 알아.
-[LLMoker][DEBUG] 사야 카드 교체 판단 시작 / 현재 손패: 다이아 2, 클로버 8, 다이아 9, 클로버 3, 클로버 Queen (하이카드)
-[LLMoker][DEBUG] 사야 카드 교체 선택 완료 / 버릴 인덱스: [0, 2] / 이유: 다이아 2와 클로버 3를 버리고 클로버 8과 다이아 9, 클로버 Queen으로 하이카드를 유지한다. / 상태: Qwen 런타임 요청 성공
-[LLMoker][DEBUG] 사야 드로우 후 손패: 다이아 8, 클로버 8, 다이아 King, 클로버 3, 클로버 Queen (원페어)
-[LLMoker][DEBUG] 플레이어 행동 선택 / 페이즈: 두 번째 베팅 / 선택: check / 허용 행동: fold, check, bet
-[LLMoker][DEBUG] 턴 전환 / 다음 차례: 사야 / 현재 페이즈: 두 번째 베팅
-[LLMoker][DEBUG] 사야 행동 판단 시작 / 페이즈: 두 번째 베팅 / 손패: 다이아 8, 클로버 8, 다이아 King, 클로버 3, 클로버 Queen (원페어) / 허용 행동: fold, check, bet
-[LLMoker][DEBUG] 사야 행동 선택 완료 / 선택: bet / 이유: 현재 베팅액이 0칩이고 콜 금액이 0칩이므로, 내 손패의 원페어를 기반으로 팟에 10칩을 베팅하여 리스크를 증가시킨다. / 상태: Qwen 런타임 요청 성공
-[LLMoker][DEBUG] 턴 전환 / 다음 차례: 플레이어 / 현재 페이즈: 두 번째 베팅
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: betting / 내용: 그 베팅이 맞는 판단인지 두고 봐.
-[LLMoker][DEBUG] 플레이어 행동 선택 / 페이즈: 두 번째 베팅 / 선택: call / 허용 행동: fold, call, raise
-[LLMoker][DEBUG] 페이즈 전환 / 다음 페이즈: 쇼다운 / 사유: 두 번째 베팅 종료
-[LLMoker][DEBUG] 쇼다운 / 플레이어: 클로버 5, 다이아 Queen, 다이아 10, 클로버 2, 스페이드 5 (원페어) / 사야: 다이아 8, 클로버 8, 다이아 King, 클로버 3, 클로버 Queen (원페어)
-[LLMoker][TRACE][POLICY] llm_feedback_start / hand_no=2 / bot_name=사야 / public_log_count=10
-[LLMoker][DEBUG] 사야 정책 피드백 완료 / 단기: 원페어 vs 원페어에서 베팅 리드로 승리, 상대의 콜을 유도함 / 장기: 동일한 족보일 경우 항상 베팅 리드를 통해 리스크를 줄인다 / 초점: 다음 판에는 상대의 베팅 행동을 먼저 확인한다
-[LLMoker][DEBUG] 쇼다운 결과 / 승자: 사야 / 팟: 50칩
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: round_end / 내용: 수고했어. 잘 졌어.
-[LLMoker][DEBUG] 라운드 3 시작 / 사야 시작 손패: 클로버 10, 하트 10, 스페이드 4, 하트 9, 스페이드 9 (투페어)
-[LLMoker][DEBUG] 사야 대사 생성 / 이벤트: round_start / 내용: 얼마나 버틸지 두고 보자.
+[LLMoker][DEBUG] 쇼다운 / 플레이어: 하트 10, 클로버 Ace, 하트 King, 스페이드 9, 클로버 King (원페어) / 사야: 다이아 King, 다이아 3, 스페이드 3, 다이아 Queen, 하트 5 (원페어)
+[LLMoker][DEBUG] 쇼다운 결과 / 승자: 플레이어 / 팟: 70칩
+[LLMoker][TRACE][POLICY] llm_feedback_start / hand_no=3 / bot_name=사야 / public_log_count=10
+[LLMoker][DEBUG] 사야 정책 피드백 완료 / 단기: self는 원페어로 콜을 더 신중히 고른다. / 장기: self는 opponent의 두 번째 베팅을 주의 깊게 관찰한다. / 초점: 상대 두 번째 베팅
+[LLMoker][DEBUG] 행동 적용 / 주체: 당신 / 행동: call / 팟: 70칩 / 현재 베팅: 20칩 / 플레이어 기여: 20칩 / 사야 기여: 20칩 / 콜 금액(플레이어): 0칩 / 콜 금액(사야): 0칩 / 다음 차례: 플레이어
+[LLMoker][DEBUG] 라운드 4 시작 / 사야 시작 손패: 스페이드 Jack, 스페이드 10, 스페이드 5, 하트 5, 스페이드 4 (원페어)

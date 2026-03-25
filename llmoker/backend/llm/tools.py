@@ -7,21 +7,6 @@ from qwen_agent.tools.base import BaseTool
 
 
 _TOOL_CONTEXT = {}
-_LAST_SELECTED_DIALOGUE_INDEX = None
-
-
-def get_and_clear_selected_dialogue_index():
-    """
-    SelectDialogueLineTool이 마지막으로 선택한 인덱스를 가져오고 초기화한다.
-
-    Returns:
-        마지막 선택 인덱스 정수 또는 None이다.
-    """
-
-    global _LAST_SELECTED_DIALOGUE_INDEX
-    idx = _LAST_SELECTED_DIALOGUE_INDEX
-    _LAST_SELECTED_DIALOGUE_INDEX = None
-    return idx
 
 
 def set_tool_context(context):
@@ -217,52 +202,6 @@ class GetRoundSummaryTool(BaseTool):
         return json.dumps(_TOOL_CONTEXT.get("round_summary", {}), ensure_ascii=False)
 
 
-class SelectDialogueLineTool(BaseTool):
-    """
-    미리 작성된 대사 목록에서 현재 상황에 맞는 번호 하나를 선택하는 Qwen-Agent 도구다.
-    LLM이 자유 생성 대신 번호 선택만 하도록 제한해 출력 품질을 보장한다.
-    """
-
-    name = "select_dialogue_line"
-    description = "현재 상황에 가장 어울리는 대사 번호를 선택한다."
-    parameters = {
-        "type": "object",
-        "properties": {
-            "index": {
-                "type": "integer",
-                "description": "선택할 대사 번호 (0부터 시작)",
-            },
-        },
-        "required": ["index"],
-    }
-
-    def call(self, params, **kwargs):
-        """
-        선택한 번호에 해당하는 대사 텍스트를 돌려준다.
-
-        Args:
-            params: Qwen-Agent가 넘긴 JSON 인자다.
-            **kwargs: Qwen-Agent 내부 부가 인자다.
-
-        Returns:
-            선택된 대사 문자열이다.
-        """
-
-        global _LAST_SELECTED_DIALOGUE_INDEX
-        args = self._verify_json_format_args(params)
-        lines = _TOOL_CONTEXT.get("dialogue_lines", [])
-        try:
-            index = int(args.get("index", 0))
-        except (TypeError, ValueError):
-            index = 0
-        if not lines:
-            _LAST_SELECTED_DIALOGUE_INDEX = 0
-            return ""
-        index = max(0, min(index, len(lines) - 1))
-        _LAST_SELECTED_DIALOGUE_INDEX = index
-        return lines[index]
-
-
 def build_poker_tools():
     """
     Qwen-Agent가 사용할 포커 전용 도구 인스턴스 목록을 새로 만든다.
@@ -278,15 +217,3 @@ def build_poker_tools():
         GetRecentLogTool(),
         GetRoundSummaryTool(),
     ]
-
-
-def build_dialogue_select_tools():
-    """
-    대사 선택 전용 도구 인스턴스 목록을 새로 만든다.
-    SelectDialogueLineTool 하나만 포함해 LLM이 번호 선택에만 집중하게 한다.
-
-    Returns:
-        대사 선택 전용 도구 인스턴스 목록이다.
-    """
-
-    return [SelectDialogueLineTool()]

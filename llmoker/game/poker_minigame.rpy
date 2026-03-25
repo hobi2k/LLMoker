@@ -25,20 +25,22 @@ label poker_phase_loop:
             jump poker_runtime_error
 
         $ update_status_from_messages(round_messages, fallback="행동을 완료했습니다.")
+        $ play_dialogue_event("betting", round_messages)
         if get_poker_match().round_over:
             jump poker_round_end
-        $ play_dialogue_event("betting", round_messages)
         jump poker_phase_loop
 
     if get_poker_match().phase == "draw":
         $ poker_status_text = "드로우 단계입니다. 최대 %d장까지 교체할 수 있습니다." % get_poker_match().config.max_discards
         $ draw_action = renpy.call_screen("poker_table_screen", mode="draw")
-        $ play_dialogue_event("draw")
+        if draw_action not in ("confirm", "skip"):
+            jump poker_phase_loop
         $ round_messages = safe_resolve_draw_phase(poker_selected_discards)
         $ poker_selected_discards = []
         if poker_fatal_error_text:
             jump poker_runtime_error
         $ update_status_from_messages(round_messages, fallback="드로우를 완료했습니다.")
+        $ play_dialogue_event("draw", round_messages)
         if get_poker_match().round_over:
             jump poker_round_end
         jump poker_phase_loop

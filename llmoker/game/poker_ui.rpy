@@ -225,46 +225,46 @@ screen poker_table_screen(mode="betting_open"):
         frame:
             xalign 0.5
             yalign 0.032
-            xmaximum gui_scale(944)
-            padding (gui_scale(16), gui_scale(12))
+            xmaximum gui_scale(980)
+            padding (gui_scale(20), gui_scale(14))
             background "#08111cea"
 
             vbox:
-                spacing 10
+                spacing gui_scale(8)
 
                 hbox:
-                    spacing gui_scale(20)
+                    spacing gui_scale(26)
 
                     vbox:
-                        spacing 3
+                        spacing 4
                         text "페이즈" size gui_scale(13) color "#89b6ff" font "fonts/malgunbd.ttf"
                         text "[get_poker_match().phase_name_ko()]" size gui_scale(24) color "#f5f5f5" font "fonts/malgunbd.ttf"
                         text "당신 [get_poker_match().player.stack] / [get_poker_match().bot.name] [get_poker_match().bot.stack]" size gui_scale(16) color "#edf3ff" font "fonts/malgun.ttf"
 
                     vbox:
-                        spacing 3
+                        spacing 4
                         text "팟" size gui_scale(13) color "#89b6ff" font "fonts/malgunbd.ttf"
                         text "[get_poker_match().pot]칩" size gui_scale(23) color "#f5f5f5" font "fonts/malgunbd.ttf"
                         if get_poker_match().current_bet > 0:
-                            text "현재 베팅액: [get_poker_match().current_bet]칩" size gui_scale(14) color "#c8d6f0" font "fonts/malgun.ttf" xmaximum gui_scale(240)
+                            text "현재 테이블 베팅: [get_poker_match().current_bet]칩" size gui_scale(14) color "#c8d6f0" font "fonts/malgun.ttf" xmaximum gui_scale(240)
                         else:
-                            text "베팅 없음" size gui_scale(14) color "#c8d6f0" font "fonts/malgun.ttf" xmaximum gui_scale(240)
+                            text "현재 테이블 베팅 없음" size gui_scale(14) color "#c8d6f0" font "fonts/malgun.ttf" xmaximum gui_scale(240)
 
                     vbox:
-                        spacing 3
+                        spacing 4
                         text "현재 족보" size gui_scale(13) color "#89b6ff" font "fonts/malgunbd.ttf"
                         text "[get_poker_match().get_player_hand_name()]" size gui_scale(20) color "#ffd77a" font "fonts/malgunbd.ttf"
                         if poker_status_text:
                             text "[poker_status_text]" size gui_scale(15) color "#ffe082" font "fonts/malgunbd.ttf" xmaximum gui_scale(260) line_spacing 2
 
                     vbox:
-                        spacing 3
+                        spacing 4
                         text "상대 AI" size gui_scale(13) color "#89b6ff" font "fonts/malgunbd.ttf"
                         text "[get_poker_match().get_bot_mode_label()]" size gui_scale(18) color "#9ed6ff" font "fonts/malgunbd.ttf"
-                        if get_poker_match().get_last_action_reason_text():
-                            text "[get_poker_match().get_last_action_reason_text()]" size gui_scale(13) color "#c8d6f0" font "fonts/malgun.ttf" xmaximum gui_scale(220) line_spacing 2
+                        if get_poker_match().get_last_bot_action_summary_text():
+                            text "[get_poker_match().get_last_bot_action_summary_text()]" size gui_scale(13) color "#c8d6f0" font "fonts/malgun.ttf" xmaximum gui_scale(240) line_spacing 2
                         else:
-                            text "[get_poker_match().get_llm_status_text()]" size gui_scale(13) color "#c8d6f0" font "fonts/malgun.ttf" xmaximum gui_scale(220)
+                            text "아직 행동 전" size gui_scale(13) color "#c8d6f0" font "fonts/malgun.ttf" xmaximum gui_scale(240) line_spacing 2
 
     if mode == "round_end":
         frame:
@@ -457,10 +457,10 @@ screen poker_table_screen(mode="betting_open"):
                     elif mode == "draw":
                         textbutton "교체 확정":
                             style "poker_action_button"
-                            action Return("confirm")
+                            action Function(confirm_draw_selection)
                         textbutton "교체 없이 진행":
                             style "poker_dock_button"
-                            action [SetVariable("poker_selected_discards", []), Return("confirm")]
+                            action Function(skip_draw_selection)
                 if mode == "betting" and "fold" in get_poker_match().get_player_available_actions():
                     hbox:
                         xalign 0.5

@@ -55,29 +55,6 @@ def build_chat_payload(mode, max_tokens):
             "top_p": 0.8,
         }
 
-    if mode == "dialogue":
-        return {
-            "mode": "chat",
-            "system_message": "\n".join(
-                [
-                    "너는 포커를 플레이하는 캐릭터 사야다.",
-                    "플레이어에게 직접 건네는 한국어 대사만 한 줄 또는 두 줄로 답한다.",
-                    "짧은 반말로 자연스럽게 말한다.",
-                    "설명, 영어, JSON은 쓰지 않는다.",
-                ]
-            ),
-            "user_message": "\n".join(
-                [
-                    "이벤트: match_intro",
-                    "상황: 첫 판이 막 시작됐다.",
-                    "상대를 가볍게 떠보는 한마디만 바로 말해.",
-                ]
-            ),
-            "max_new_tokens": max_tokens,
-            "temperature": 0.45,
-            "top_p": 0.9,
-        }
-
     raise ValueError("지원하지 않는 mode입니다: %s" % mode)
 
 
@@ -90,7 +67,7 @@ def main():
     """
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=["sanity", "dialogue"], default="dialogue")
+    parser.add_argument("--mode", choices=["sanity"], default="sanity")
     parser.add_argument("--max-tokens", type=int, default=64)
     args = parser.parse_args()
 

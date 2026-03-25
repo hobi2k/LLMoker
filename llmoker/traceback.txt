@@ -1,35 +1,28 @@
 ﻿I'm sorry, but an uncaught exception occurred.
 
 While running game code:
-  File "game/poker_minigame.rpy", line 72, in script
-    "[poker_fatal_error_text]"
-Exception: Open text tag at end of string 'LLM NPC 행동 선택 실패: LLM이 허용되지 않은 행동을 반환했습니다. 출력 미리보기: {"action": "bet", "reason": "현재 베팅액이 0칩이고 콜 금액이 0칩이므로, 원페어를 가진 내 손패로 팟에 10칩을 베팅하여 경쟁을 유도'.
+  File "game/poker_minigame.rpy", line 53, in script
+    $ poker_round_summary_text = "\n".join(get_poker_match().get_round_summary_lines())
+  File "game/poker_minigame.rpy", line 53, in <module>
+    $ poker_round_summary_text = "\n".join(get_poker_match().get_round_summary_lines())
+KeyError: 'short_term'
 
 -- Full Traceback ------------------------------------------------------------
 
 Full traceback:
-  File "game/poker_minigame.rpy", line 72, in script
-    "[poker_fatal_error_text]"
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/ast.py", line 2557, in execute
-    Say.execute(self)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/ast.py", line 615, in execute
-    renpy.exports.say(who, what, *args, **kwargs)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/exports.py", line 1493, in say
-    who(what, *args, **kwargs)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/character.py", line 1394, in __call__
-    self.do_display(who, what, cb_args=self.cb_args, dtt=dtt, **display_args)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/character.py", line 1045, in do_display
-    display_say(who,
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/character.py", line 722, in display_say
-    what_text.update()
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/text/text.py", line 1970, in update
-    tokens = self.tokenize(text)
-  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/text/text.py", line 2450, in tokenize
-    tokens.extend(textsupport.tokenize(i))
-  File "textsupport.pyx", line 169, in renpy.text.textsupport.tokenize
-Exception: Open text tag at end of string 'LLM NPC 행동 선택 실패: LLM이 허용되지 않은 행동을 반환했습니다. 출력 미리보기: {"action": "bet", "reason": "현재 베팅액이 0칩이고 콜 금액이 0칩이므로, 원페어를 가진 내 손패로 팟에 10칩을 베팅하여 경쟁을 유도'.
+  File "game/poker_minigame.rpy", line 53, in script
+    $ poker_round_summary_text = "\n".join(get_poker_match().get_round_summary_lines())
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/ast.py", line 823, in execute
+    renpy.python.py_exec_bytecode(self.code.bytecode, self.hide, store=self.store)
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/renpy/python.py", line 1178, in py_exec_bytecode
+    exec(bytecode, globals, locals)
+  File "game/poker_minigame.rpy", line 53, in <module>
+    $ poker_round_summary_text = "\n".join(get_poker_match().get_round_summary_lines())
+  File "/home/hosung/pytorch-demo/LLMoker/llmoker/backend/poker_engine.py", line 1238, in get_round_summary_lines
+    lines.append("전략 피드백: %s" % self.latest_feedback["short_term"])
+KeyError: 'short_term'
 
 Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39 x86_64
 Ren'Py 8.2.1.24030407
 LLMoker 1.0
-Wed Mar 25 11:32:44 2026
+Thu Mar 26 00:50:30 2026

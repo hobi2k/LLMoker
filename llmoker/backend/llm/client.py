@@ -32,6 +32,8 @@ class QwenRuntimeClient:
 
     _process = None
     _signature = None
+    _dependencies_ready = set()
+    _models_ready = set()
 
     def __init__(
         self,
@@ -117,7 +119,13 @@ class QwenRuntimeClient:
     def _run_bootstrap_command(self, command):
         env = os.environ.copy()
         env["PYTHONPATH"] = str(ROOT_DIR)
-        subprocess.check_call(command, cwd=str(ROOT_DIR), env=env)
+        subprocess.check_call(
+            command,
+            cwd=str(ROOT_DIR),
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
 
     def _ensure_runtime_virtualenv(self):
         venv_python = self._venv_python_path()
@@ -179,17 +187,26 @@ class QwenRuntimeClient:
             return False
 
     def _ensure_runtime_dependencies(self):
+        dependency_key = (self.runtime_python, str(REQUIREMENTS_PATH))
+        if dependency_key in self.__class__._dependencies_ready:
+            return True
         if self._has_required_runtime_packages():
+            self.__class__._dependencies_ready.add(dependency_key)
             return True
         try:
             self._run_bootstrap_command([self.runtime_python, "-m", "pip", "install", "-r", str(REQUIREMENTS_PATH)])
+            self.__class__._dependencies_ready.add(dependency_key)
             return True
         except Exception as exc:
             self.last_status = f"LLM 의존성 설치 실패: {exc}"
             return False
 
     def _ensure_model_files(self):
+        model_key = (self.runtime_python, self.model_path)
+        if model_key in self.__class__._models_ready and self.has_model_files():
+            return True
         if self.has_model_files():
+            self.__class__._models_ready.add(model_key)
             return True
         try:
             self._run_bootstrap_command([self.runtime_python, "-m", "backend.llm.model_bootstrap"])
@@ -197,6 +214,7 @@ class QwenRuntimeClient:
             self.last_status = f"LLM 모델 다운로드 실패: {exc}"
             return False
         if self.has_model_files():
+            self.__class__._models_ready.add(model_key)
             return True
         self.last_status = self.missing_model_message()
         return False
@@ -311,6 +329,16 @@ class QwenRuntimeClient:
             준비 성공 여부다.
         """
 
+        if self.is_running():
+            self.last_status = "Transformers 런타임 준비 완료"
+            self._signature = self.signature()
+            return True
+
+        if self.is_running():
+            self.last_status = "Transformers 런타임 준비 완료"
+            self._signature = self.signature()
+            return True
+
         if not self._ensure_runtime_virtualenv():
             return False
 
@@ -322,11 +350,6 @@ class QwenRuntimeClient:
 
         if not self._ensure_model_files():
             return False
-
-        if self.is_running():
-            self.last_status = "Transformers 런타임 준비 완료"
-            self._signature = self.signature()
-            return True
 
         process = self._process
         if process is None or process.poll() is not None or self._signature != self.signature():

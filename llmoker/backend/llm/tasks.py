@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 
 from backend.llm.prompts import (
     build_action_prompt,
-    build_dialogue_state_text,
-    build_dialogue_prompt,
     build_draw_prompt,
     build_policy_feedback_prompt,
     build_public_state_text,
@@ -49,6 +48,100 @@ class PokerAgentTask:
         return payload
 
 
+_ACTION_PATTERNS = (
+    (re.compile(r"^당신이\(가\) 체크했습니다\.$"), "opponent check"),
+    (re.compile(r"^사야이\(가\) 체크했습니다\.$"), "self check"),
+    (re.compile(r"^당신이\(가\) (\d+)칩 베팅했습니다\.$"), "opponent bet {0}"),
+    (re.compile(r"^사야이\(가\) (\d+)칩 베팅했습니다\.$"), "self bet {0}"),
+    (re.compile(r"^당신이\(가\) (\d+)칩 콜했습니다\.$"), "opponent call {0}"),
+    (re.compile(r"^사야이\(가\) (\d+)칩 콜했습니다\.$"), "self call {0}"),
+    (re.compile(r"^당신이\(가\) \d+칩을 더 올려 총 (\d+)칩이 되도록 레이즈했습니다\.$"), "opponent raise_to {0}"),
+    (re.compile(r"^사야이\(가\) \d+칩을 더 올려 총 (\d+)칩이 되도록 레이즈했습니다\.$"), "self raise_to {0}"),
+    (re.compile(r"^당신이\(가\) 폴드했습니다\.$"), "opponent fold"),
+    (re.compile(r"^사야이\(가\) 폴드했습니다\.$"), "self fold"),
+    (re.compile(r"^당신은 (\d+)장의 카드를 교체했습니다\.$"), "opponent draw {0}"),
+    (re.compile(r"^당신은 교체 없이 진행했습니다\.$"), "opponent draw 0"),
+    (re.compile(r"^사야은\(는\) (\d+)장의 카드를 교체했습니다\.$"), "self draw {0}"),
+    (re.compile(r"^사야은\(는\) 교체 없이 진행했습니다\.$"), "self draw 0"),
+)
+
+
+def _normalize_role_terms(text, bot_name="사야"):
+    """
+    LLM 문맥에서 주체 용어를 self/opponent로 고정한다.
+
+    Args:
+        text: 변환할 원문 문자열이다.
+        bot_name: 현재 NPC 이름이다.
+
+    Returns:
+        self/opponent 기준으로 정리된 문자열이다.
+    """
+
+    normalized = " ".join(str(text or "").split())
+    if not normalized:
+        return ""
+    normalized = normalized.replace("당신", "opponent")
+    normalized = normalized.replace(bot_name, "self")
+    normalized = normalized.replace("플레이어", "opponent")
+    return normalized
+
+
+def _summarize_policy_action_facts(public_log_lines):
+    """
+    공개 로그를 회고용 행동 사실 요약으로 압축한다.
+
+    Args:
+        public_log_lines: 공개 로그 문자열 목록이다.
+
+    Returns:
+        사람이 읽기 쉬운 행동 사실 문자열 목록이다.
+    """
+
+    phase = "첫 번째 베팅"
+    grouped = {
+        "첫 번째 베팅": [],
+        "드로우": [],
+        "두 번째 베팅": [],
+    }
+    termination = None
+
+    for raw_line in public_log_lines or []:
+        line = " ".join(str(raw_line or "").split())
+        if not line:
+            continue
+        if line == "드로우 단계로 넘어갑니다.":
+            phase = "드로우"
+            continue
+        if line == "쇼다운입니다.":
+            phase = "두 번째 베팅"
+            termination = "쇼다운 종료"
+            continue
+        if "이번 라운드를 가져갔습니다." in line or "무승부입니다." in line:
+            if termination is None:
+                termination = "폴드 종료" if "폴드했습니다." in " ".join(public_log_lines or []) else "쇼다운 종료"
+            continue
+
+        matched = False
+        for pattern, template in _ACTION_PATTERNS:
+            match = pattern.match(line)
+            if match:
+                grouped[phase].append(template.format(*match.groups()))
+                matched = True
+                break
+        if matched:
+            continue
+
+    facts = []
+    for label in ("첫 번째 베팅", "드로우", "두 번째 베팅"):
+        items = grouped[label]
+        if items:
+            facts.append("%s 행동: %s" % (label, " -> ".join(items)))
+    if termination:
+        facts.append("종료 방식: %s" % termination)
+    return facts
+
+
 def build_decision_context(match, legal_actions):
     """
     행동과 카드 교체 판단에 필요한 최소 공개 문맥만 만든다.
@@ -63,7 +156,35 @@ def build_decision_context(match, legal_actions):
 
     recent_log_lines = []
     for line in match.get_public_log_lines():
-        recent_log_lines.append(" ".join(str(line or "").split()))
+        recent_log_lines.append(_normalize_role_terms(line, match.bot.name))
+
+    recent_feedback_items = []
+    long_term_memory_items = []
+    if getattr(match, "memory_manager", None) is not None:
+        recent_feedback_items = match.memory_manager.get_recent_feedback(
+            match.bot.name,
+            limit=3,
+            long_term=False,
+        )
+        long_term_memory_items = match.memory_manager.get_recent_feedback(
+            match.bot.name,
+            limit=2,
+            long_term=True,
+        )
+
+    recent_feedback_texts = []
+    for item in recent_feedback_items:
+        text = item.get("text", "") if isinstance(item, dict) else item
+        normalized = " ".join(str(text or "").split())
+        if normalized:
+            recent_feedback_texts.append(normalized)
+
+    long_term_memory_texts = []
+    for item in long_term_memory_items:
+        text = item.get("text", "") if isinstance(item, dict) else item
+        normalized = " ".join(str(text or "").split())
+        if normalized:
+            long_term_memory_texts.append(normalized)
 
     hand_cards = match.format_bot_hand_for_prompt()
     hand_cards_text = ", ".join(hand_cards) if hand_cards else "아직 배분 전"
@@ -78,11 +199,13 @@ def build_decision_context(match, legal_actions):
         "to_call": "%d칩" % match.get_bot_amount_to_call(),
         "bot_stack": "%d칩" % match.bot.stack,
         "player_stack": "%d칩" % match.player.stack,
-        "recent_feedback": [],
-        "long_term_memory": [],
+        "recent_feedback": recent_feedback_texts,
+        "long_term_memory": long_term_memory_texts,
         "recent_log": recent_log_lines,
         "player_name": match.player.name,
         "bot_name": match.bot.name,
+        "self_name": match.bot.name,
+        "opponent_name": match.player.name,
     }
 
 
@@ -103,6 +226,10 @@ def build_action_task(match, legal_actions):
             build_action_prompt(legal_actions),
             "공개 사실:",
             context["public_state"],
+            "최근 전략 피드백:",
+            "\n".join(context["recent_feedback"]) if context["recent_feedback"] else "(없음)",
+            "장기 전략 기억:",
+            "\n".join(context["long_term_memory"]) if context["long_term_memory"] else "(없음)",
             "최근 공개 로그:",
             "\n".join(context["recent_log"]) if context["recent_log"] else "(없음)",
             "현재 손패: %s" % context["hand_cards"],
@@ -143,6 +270,10 @@ def build_draw_task(match, max_discards):
             build_draw_prompt(max_discards),
             "공개 사실:",
             context["public_state"],
+            "최근 전략 피드백:",
+            "\n".join(context["recent_feedback"]) if context["recent_feedback"] else "(없음)",
+            "장기 전략 기억:",
+            "\n".join(context["long_term_memory"]) if context["long_term_memory"] else "(없음)",
             "최근 공개 로그:",
             "\n".join(context["recent_log"]) if context["recent_log"] else "(없음)",
             "현재 손패: %s" % context["hand_cards"],
@@ -157,134 +288,6 @@ def build_draw_task(match, max_discards):
         metadata={
             "max_discards": max_discards,
             "max_new_tokens": 128,
-        },
-    )
-
-
-def _get_dialogue_key(event_name, result_summary, recent_log, round_summary, match):
-    """
-    현재 게임 상태에서 dialogue_lines.yaml 조회에 쓸 키를 결정한다.
-
-    Args:
-        event_name: 현재 대사 이벤트 이름이다.
-        result_summary: 라운드 종료 요약 문자열이다.
-        recent_log: 최근 공개 로그 목록이다.
-        round_summary: 라운드 결과 요약 사전이다.
-        match: 현재 포커 매치 객체다.
-
-    Returns:
-        YAML 키 문자열이다.
-    """
-
-    if event_name == "match_intro":
-        return "match_intro"
-    if event_name == "round_start":
-        return "round_start"
-    if event_name == "draw":
-        return "draw"
-    if event_name in ("round_end", "match_end"):
-        winner = (round_summary or {}).get("winner", "") if isinstance(round_summary, dict) else ""
-        if winner == match.bot.name:
-            return "%s_win" % event_name
-        if winner == match.player.name:
-            return "%s_lose" % event_name
-        return "%s_draw" % event_name
-    if event_name == "betting":
-        latest = " ".join(str(recent_log[-1] or "").split()) if recent_log else ""
-        if "체크" in latest:
-            return "betting_check"
-        if "베팅" in latest:
-            return "betting_bet"
-        if "콜" in latest:
-            return "betting_call"
-        if "레이즈" in latest:
-            return "betting_raise"
-        if "폴드" in latest:
-            return "betting_neutral"
-        return "betting_neutral"
-    return "round_start"
-
-
-def _build_situation_text(event_name, dialogue_key, result_summary, recent_log, match):
-    """
-    LLM이 대사 번호를 고를 때 참고할 짧은 상황 설명 문자열을 만든다.
-
-    Args:
-        event_name: 현재 대사 이벤트 이름이다.
-        dialogue_key: YAML 조회 키다.
-        result_summary: 라운드 종료 요약 문자열이다.
-        recent_log: 최근 공개 로그 목록이다.
-        match: 현재 포커 매치 객체다.
-
-    Returns:
-        한 문장 상황 설명 문자열이다.
-    """
-
-    if result_summary:
-        return str(result_summary).strip()
-    if recent_log:
-        return str(recent_log[-1] or "").strip()
-    defaults = {
-        "match_intro": "매치가 막 시작됐다.",
-        "round_start": "새 라운드가 막 열렸다.",
-        "draw": "드로우 타이밍이 왔다.",
-        "betting_check": "상대가 체크했다.",
-        "betting_bet": "상대가 베팅했다.",
-        "betting_call": "상대가 콜했다.",
-        "betting_raise": "상대가 레이즈했다.",
-        "betting_neutral": "상대가 방금 행동을 골랐다.",
-        "round_end_win": "사야가 이겼다.",
-        "round_end_lose": "사야가 졌다.",
-        "round_end_draw": "무승부다.",
-        "match_end_win": "사야가 매치에서 이겼다.",
-        "match_end_lose": "사야가 매치에서 졌다.",
-    }
-    return defaults.get(dialogue_key, "포커 판이 진행 중이다.")
-
-
-def build_dialogue_task(match, event_name, result_summary, recent_feedback, long_term_memory, round_summary=None):
-    """
-    대사 풀에서 상황에 맞는 대사를 선택하게 할 작업을 만든다.
-    LLM은 select_dialogue_line 도구로 번호만 고른다.
-
-    Args:
-        match: 현재 포커 매치 객체다.
-        event_name: 현재 대사 이벤트 이름이다.
-        result_summary: 라운드 종료 시 요약 문자열이다.
-        recent_feedback: 단기 기억 목록이다.
-        long_term_memory: 장기 기억 목록이다.
-        round_summary: 라운드 결과 요약 사전이다.
-
-    Returns:
-        대사 선택용 `PokerAgentTask`다.
-    """
-
-    recent_public_log = match.get_public_log_lines()
-    recent_log_lines = []
-    for line in recent_public_log:
-        recent_log_lines.append(" ".join(str(line or "").split()))
-
-    active_round_summary = round_summary if isinstance(round_summary, dict) else getattr(match, "round_summary", None)
-    dialogue_key = _get_dialogue_key(event_name, result_summary, recent_log_lines, active_round_summary, match)
-    situation_text = _build_situation_text(event_name, dialogue_key, result_summary, recent_log_lines, match)
-
-    return PokerAgentTask(
-        mode="dialogue",
-        prompt=situation_text,
-        context={
-            "public_state": build_dialogue_state_text(match),
-            "recent_feedback": recent_feedback,
-            "long_term_memory": long_term_memory,
-            "recent_log": recent_log_lines,
-            "player_name": match.player.name,
-            "bot_name": match.bot.name,
-            "round_summary": active_round_summary or {},
-        },
-        metadata={
-            "event_name": event_name,
-            "dialogue_key": dialogue_key,
-            "situation": situation_text,
-            "max_new_tokens": 32,
         },
     )
 
@@ -307,38 +310,55 @@ def build_policy_task(round_summary, public_log, bot_name, recent_feedback, long
     recent_feedback_texts = []
     for item in recent_feedback or []:
         text = item.get("text", "") if isinstance(item, dict) else item
-        recent_feedback_texts.append(" ".join(str(text or "").split()))
+        normalized = " ".join(str(text or "").split())
+        if normalized:
+            recent_feedback_texts.append(normalized)
 
     long_term_memory_texts = []
     for item in long_term_memory or []:
         text = item.get("text", "") if isinstance(item, dict) else item
-        long_term_memory_texts.append(" ".join(str(text or "").split()))
+        normalized = " ".join(str(text or "").split())
+        if normalized:
+            long_term_memory_texts.append(normalized)
 
     recent_log_lines = []
     for line in public_log or []:
-        recent_log_lines.append(" ".join(str(line or "").split()))
+        normalized = " ".join(str(line or "").split())
+        if normalized:
+            recent_log_lines.append(normalized)
+
+    self_result = "draw"
+    if round_summary.get("winner") == bot_name:
+        self_result = "win"
+    elif round_summary.get("winner") not in ("무승부", None, ""):
+        self_result = "lose"
 
     summary_lines = [
-        "라운드 번호: %s" % round_summary.get("hand_no"),
-        "승자: %s" % round_summary.get("winner"),
-        "내 족보: %s" % round_summary.get("bot_hand_name"),
-        "상대 족보: %s" % round_summary.get("player_hand_name"),
-        "팟: %s칩" % round_summary.get("pot"),
-        "내 스택: %s칩" % round_summary.get("bot_stack"),
-        "상대 스택: %s칩" % round_summary.get("player_stack"),
+        "hand_no: %s" % round_summary.get("hand_no"),
+        "self_name: %s" % round_summary.get("bot_name"),
+        "opponent_name: 플레이어",
+        "self_result: %s" % self_result,
+        "winner: %s" % round_summary.get("winner"),
+        "self_hand_rank: %s" % round_summary.get("bot_hand_name"),
+        "opponent_hand_rank: %s" % round_summary.get("player_hand_name"),
+        "ended_by_fold: %s" % ("yes" if round_summary.get("ended_by_fold") else "no"),
+        "pot: %s칩" % round_summary.get("pot"),
+        "self_stack_after_round: %s칩" % round_summary.get("bot_stack"),
+        "opponent_stack_after_round: %s칩" % round_summary.get("player_stack"),
     ]
+    action_facts = [_normalize_role_terms(line, bot_name) for line in _summarize_policy_action_facts(recent_log_lines)]
+    action_fact_text = "\n".join(action_facts)
+    normalized_recent_log_lines = [_normalize_role_terms(line, bot_name) for line in recent_log_lines]
 
     prompt = "\n".join(
         [
             build_policy_feedback_prompt(),
-            "라운드 요약:",
+            "확정 사실:",
             "\n".join(summary_lines),
+            "행동 사실:",
+            action_fact_text or "(없음)",
             "최근 공개 로그:",
-            "\n".join(recent_log_lines) if recent_log_lines else "(없음)",
-            "최근 단기 기억:",
-            "\n".join(recent_feedback_texts) if recent_feedback_texts else "(없음)",
-            "장기 기억:",
-            "\n".join(long_term_memory_texts) if long_term_memory_texts else "(없음)",
+            "\n".join(normalized_recent_log_lines) if normalized_recent_log_lines else "(없음)",
         ]
     )
 
@@ -349,9 +369,9 @@ def build_policy_task(round_summary, public_log, bot_name, recent_feedback, long
             "round_summary": round_summary,
             "recent_feedback": recent_feedback_texts,
             "long_term_memory": long_term_memory_texts,
-            "recent_log": recent_log_lines,
+            "recent_log": normalized_recent_log_lines,
             "public_state": "",
             "bot_name": bot_name,
         },
-        metadata={"max_new_tokens": 384},
+        metadata={"max_new_tokens": 256},
     )

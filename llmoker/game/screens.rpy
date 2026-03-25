@@ -1064,27 +1064,54 @@ screen help():
         style_prefix "help"
 
         vbox:
-            spacing 18
+            spacing 22
 
             text "LLMoker 기본 조작" size gui_scale(30) color "#ffffff" font "fonts/malgunbd.ttf"
 
             vbox:
                 spacing 8
                 text "테이블 진행" size gui_scale(24) color "#ffe8a3" font "fonts/malgunbd.ttf"
-                text "Enter, Space, 마우스 클릭으로 대사를 넘긴다." size gui_scale(19) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(760)
+                text "Enter, Space, 마우스 클릭으로 시스템 나레이션과 안내 문구를 넘긴다." size gui_scale(19) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(760)
                 text "메인 메뉴에서는 왼쪽 내비게이션, 게임 중에는 하단 도크를 사용한다." size gui_scale(19) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(760)
-
-            vbox:
-                spacing 8
-                text "행동 선택" size gui_scale(24) color "#ffe8a3" font "fonts/malgunbd.ttf"
-                text "베팅 단계에서는 체크, 베팅, 콜, 레이즈, 폴드를 선택한다." size gui_scale(19) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(760)
-                text "드로우 단계에서는 교체할 카드를 누른 뒤 교체 확정을 누른다." size gui_scale(19) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(760)
 
             vbox:
                 spacing 8
                 text "화면 전환" size gui_scale(24) color "#ffe8a3" font "fonts/malgunbd.ttf"
                 text "Esc 또는 우측 시스템 도크의 메인 메뉴 버튼으로 게임 메뉴를 연다." size gui_scale(19) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(760)
                 text "로그 보기, 저장, 불러오기, 환경 설정은 시스템 도크에서 연다." size gui_scale(19) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(760)
+
+            null height 10
+
+            text "게임 진행 규칙" size gui_scale(30) color "#ffffff" font "fonts/malgunbd.ttf"
+
+            vbox:
+                spacing 8
+                text "한 라운드 흐름" size gui_scale(24) color "#ffe8a3" font "fonts/malgunbd.ttf"
+                text "1. 플레이어와 사야가 각각 카드 5장을 받는다. 이때 위 HUD에 현재 페이즈, 팟, 현재 족보, 콜 금액이 표시된다." size gui_scale(19) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(760)
+                text "2. 첫 번째 베팅이 시작되면 항상 당신이 먼저 행동한다. 당신이 체크, 베팅, 콜, 레이즈, 폴드 중 하나를 고르면 그 다음에 사야가 반응한다." size gui_scale(19) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(760)
+                text "3. 첫 번째 베팅이 끝나면 드로우 단계로 넘어간다. 당신이 먼저 교체할 카드를 고르고, 그 뒤에 사야가 자기 카드를 교체한다." size gui_scale(19) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(760)
+                text "4. 드로우가 끝나면 두 번째 베팅이 시작되고, 여기서도 당신이 먼저 행동한다. 이번에도 당신의 선택 뒤에 사야가 반응한다." size gui_scale(19) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(760)
+                text "5. 누구도 폴드하지 않으면 쇼다운으로 넘어가 서로의 손패를 공개하고 승자를 정한다." size gui_scale(19) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(760)
+
+            vbox:
+                spacing 8
+                text "베팅 버튼이 바뀌는 기준" size gui_scale(24) color "#ffe8a3" font "fonts/malgunbd.ttf"
+                text "현재 테이블 베팅이 0칩이면 `체크`와 `베팅 10칩`이 뜬다. 체크는 그대로 넘기는 선택이고, 베팅은 이번 라운드의 첫 금액 10칩을 거는 선택이다." size gui_scale(19) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(760)
+                text "상대가 이미 칩을 걸어 현재 콜 금액이 생기면 `콜 n칩`과 `레이즈 n칩`이 뜬다. 콜은 지금 맞춰야 하는 금액만큼 따라가는 것이고, 레이즈는 콜 금액에 고정 10칩을 더해 총액을 올리는 것이다." size gui_scale(19) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(760)
+                text "`폴드`는 그 라운드를 즉시 포기하는 선택이다. 내가 폴드하면 사야가 바로 승리하고, 사야가 폴드하면 당신이 바로 승리한다." size gui_scale(19) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(760)
+                text "상단 HUD의 `현재 테이블 베팅`은 지금 판에서 맞춰야 하는 기준 금액이고, `현재 콜 금액`은 내가 지금 당장 더 내야 하는 칩 수다. `남은 레이즈`는 이번 베팅 라운드에서 추가로 올릴 수 있는 횟수다." size gui_scale(19) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(760)
+
+            vbox:
+                spacing 8
+                text "드로우 단계" size gui_scale(24) color "#ffe8a3" font "fonts/malgunbd.ttf"
+                text "카드를 눌러 교체할 카드를 표시한 뒤 `교체 확정`을 누르면 선택한 카드만 바뀐다. 카드를 하나도 고르지 않았는데 `교체 확정`을 누르면 진행되지 않는다." size gui_scale(19) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(760)
+                text "`교체 없이 진행`은 정말 한 장도 바꾸지 않고 넘어가고 싶을 때만 쓰는 버튼이다. 이 버튼과 `교체 확정`은 역할이 다르다." size gui_scale(19) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(760)
+
+            vbox:
+                spacing 8
+                text "화면 읽는 법" size gui_scale(24) color "#ffe8a3" font "fonts/malgunbd.ttf"
+                text "상단 HUD는 현재 페이즈, 팟, 양쪽 스택, 현재 족보, 콜 금액, 남은 레이즈를 보여준다. 우측 AI 영역에는 사야가 방금 한 실제 행동이 표시된다." size gui_scale(19) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(760)
+                text "좌하단은 지금 당장 누를 수 있는 행동 버튼이고, 우하단은 로그 보기, 저장, 불러오기, 환경 설정, 메인 메뉴를 여는 시스템 도크다." size gui_scale(19) color "#f3f3f3" font "fonts/malgun.ttf" xmaximum gui_scale(760)
 
 
 style help_button is gui_button

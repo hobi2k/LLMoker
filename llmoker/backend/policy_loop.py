@@ -1,7 +1,6 @@
 """라운드 종료 결과를 기억 저장용 전략 피드백으로 바꾼다."""
 
 import sys
-import traceback
 
 
 def _trace_policy(stage, **fields):
@@ -31,7 +30,7 @@ def _trace_policy(stage, **fields):
 class PolicyLoop:
     """
     라운드 결과를 다음 판단 문맥에 넣을 전략 피드백으로 바꾸고, 필요하면 기억 저장소까지 갱신한다.
-    스크립트봇일 때는 최소 규칙 기반 회고를 만들고, LLM NPC일 때는 LLM 회고 결과를 메모리에 적재한다.
+    현재 LLM NPC 경로는 LLM이 회고를 만들되, 공개 사실과 어긋나면 저장하지 않는다.
 
     Args:
         memory_manager: 피드백을 저장할 기억 저장소다.
@@ -42,37 +41,97 @@ class PolicyLoop:
         self.memory_manager = memory_manager
         self.llm_agent = llm_agent
 
-    def _build_rule_feedback(self, round_summary):
-        """
-        LLM이 없을 때 쓸 최소 규칙 기반 피드백을 만든다.
+    def _contains_any(self, text, fragments):
+        normalized = " ".join(str(text or "").split())
+        return any(fragment in normalized for fragment in fragments if fragment)
 
-        Args:
-            round_summary: 라운드 종료 요약 사전이다.
+    def _mentions_fold_without_pressure(self, text):
+        normalized = " ".join(str(text or "").split())
+        if "폴드" not in normalized:
+            return False
+        pressure_markers = [
+            "상대",
+            "상대가 먼저",
+            "상대가 베팅",
+            "상대의 베팅",
+            "상대가 레이즈",
+            "상대의 레이즈",
+            "베팅",
+            "레이즈",
+            "레이즈를 받았",
+            "콜 금액",
+            "베팅을 맞춰야",
+            "상대 선베팅",
+        ]
+        return not any(marker in normalized for marker in pressure_markers)
 
-        Returns:
-            단기 회고, 장기 회고, 전략 초점을 담은 사전이다.
-        """
+    def _is_overgeneralized_rule(self, text):
+        normalized = " ".join(str(text or "").split())
+        if "항상" not in normalized:
+            return False
+        broad_targets = ["하이카드", "원페어", "투페어", "강한 패", "약한 패"]
+        actions = ["폴드", "체크", "콜", "베팅", "레이즈"]
+        return any(target in normalized for target in broad_targets) and any(action in normalized for action in actions)
 
-        bot_name = round_summary["bot_name"]
-        winner = round_summary["winner"]
-        bot_hand_name = round_summary["bot_hand_name"]
-        player_hand_name = round_summary["player_hand_name"]
+    def _validate_feedback(self, round_summary, feedback):
+        if not isinstance(feedback, dict):
+            return "회고 결과 형식이 올바르지 않습니다."
 
-        if winner == bot_name:
-            short_term = "%s은(는) 이번 판에서 %s로 승리했다." % (bot_name, bot_hand_name)
-            long_term = "강한 패를 잡았을 때 공격적으로 마무리하면 좋은 결과가 난다."
-        else:
-            short_term = "%s은(는) 이번 판에서 %s로 패배했다." % (bot_name, bot_hand_name)
-            if round_summary.get("bot_folded"):
-                long_term = "폴드 판단은 안전했지만, 상대의 약한 패 가능성도 계속 관찰해야 한다."
-            else:
-                long_term = "이번에는 %s에 밀렸다. 드로우 이후 베팅 강도를 더 보수적으로 조절할 필요가 있다." % player_hand_name
+        short_term = " ".join(str(feedback.get("short_term", "") or "").split())
+        long_term = " ".join(str(feedback.get("long_term", "") or "").split())
+        strategy_focus = " ".join(str(feedback.get("strategy_focus", "") or "").split())
+        if not short_term or not long_term or not strategy_focus:
+            return "회고 필드 중 비어 있는 값이 있습니다."
 
-        return {
-            "short_term": short_term,
-            "long_term": long_term,
-            "strategy_focus": long_term,
-        }
+        winner = str(round_summary.get("winner", "") or "")
+        bot_name = str(round_summary.get("bot_name", "") or "")
+        bot_hand_name = str(round_summary.get("bot_hand_name", "") or "")
+        player_hand_name = str(round_summary.get("player_hand_name", "") or "")
+        ended_by_fold = bool(round_summary.get("ended_by_fold"))
+
+        all_text = " / ".join([short_term, long_term, strategy_focus])
+        invalid_fragments = [
+            "하이카드로 승리했",
+            "원페어를 보였음에도",
+            "투페어를 보였음에도",
+            "트리플을 보였음에도",
+            "없는 카드",
+        ]
+        if self._contains_any(all_text, invalid_fragments):
+            return "공개 사실과 어긋나는 단정 문장이 포함돼 있습니다."
+
+        if self._mentions_fold_without_pressure(short_term) or self._mentions_fold_without_pressure(long_term):
+            return "상대 압박이 없는 상황에서 폴드를 권하는 전략은 허용하지 않습니다."
+
+        if self._is_overgeneralized_rule(long_term):
+            return "조건 없는 과잉 일반화 전략은 저장하지 않습니다."
+
+        if winner == bot_name and self._contains_any(short_term, ["self는 패배", "self가 패배", "self는 졌", "self가 졌", "self는 밀렸", "self가 밀렸"]):
+            return "승자 정보와 short_term이 충돌합니다."
+        if winner != bot_name and winner != "무승부" and self._contains_any(short_term, ["self는 승리", "self가 승리", "self는 이겼", "self가 이겼", "self는 가져갔", "self가 가져갔"]):
+            return "패배 결과와 short_term이 충돌합니다."
+        if ended_by_fold and self._contains_any(all_text, ["쇼다운", "족보 비교"]):
+            return "폴드 종료인데 쇼다운으로 서술했습니다."
+
+        hand_mentions = [bot_hand_name, player_hand_name]
+        known_hands = [
+            "하이카드",
+            "원페어",
+            "투페어",
+            "트리플",
+            "스트레이트",
+            "플러시",
+            "풀하우스",
+            "포카드",
+            "스트레이트 플러시",
+            "로열 스트레이트 플러시",
+        ]
+        mentioned_hands = [name for name in known_hands if name in short_term]
+        for hand_name in mentioned_hands:
+            if hand_name not in hand_mentions:
+                return "이번 라운드에 없는 족보 이름을 회고에 적었습니다."
+
+        return None
 
     def build_feedback(self, round_summary, public_log, bot_mode):
         """
@@ -97,8 +156,12 @@ class PolicyLoop:
             }
 
         if bot_mode != "llm_npc":
-            _trace_policy("rule_feedback", bot_mode=bot_mode, hand_no=round_summary.get("hand_no"))
-            return self._build_rule_feedback(round_summary)
+            return {
+                "short_term": "정책 피드백은 현재 LLM NPC 모드에서만 생성한다.",
+                "long_term": "스크립트봇 모드에서는 전략 기억을 갱신하지 않는다.",
+                "strategy_focus": "LLM NPC 모드 확인",
+                "status": "error",
+            }
 
         public_log = list(public_log or [])
         _trace_policy(
@@ -107,48 +170,49 @@ class PolicyLoop:
             bot_name=round_summary.get("bot_name"),
             public_log_count=len(public_log),
         )
-        try:
-            feedback = self.llm_agent.generate_policy_feedback(
-                round_summary=round_summary,
-                public_log=public_log,
-                bot_name=round_summary["bot_name"],
-            )
-        except Exception as exc:
-            _trace_policy(
-                "llm_feedback_exception",
-                hand_no=round_summary.get("hand_no"),
-                error=str(exc).strip() or "알 수 없는 오류",
-                traceback=traceback.format_exc(limit=5).strip(),
-            )
-            fallback = self._build_rule_feedback(round_summary)
-            fallback["status"] = "ok"
-            fallback["source"] = "rule_fallback"
-            fallback["llm_error"] = str(exc).strip() or "알 수 없는 오류"
-            return fallback
-
+        feedback = self.llm_agent.generate_policy_feedback(
+            round_summary=round_summary,
+            public_log=public_log,
+            bot_name=round_summary["bot_name"],
+        )
         if not isinstance(feedback, dict):
             _trace_policy(
                 "llm_feedback_invalid_type",
                 hand_no=round_summary.get("hand_no"),
                 feedback_type=type(feedback).__name__,
             )
-            fallback = self._build_rule_feedback(round_summary)
-            fallback["status"] = "ok"
-            fallback["source"] = "rule_fallback"
-            fallback["llm_error"] = "회고 응답 형식이 올바르지 않습니다."
-            return fallback
+            return {
+                "short_term": "정책 피드백 생성 실패: 회고 결과 형식이 올바르지 않습니다.",
+                "long_term": "정책 피드백 생성이 실패해 이번 라운드 회고를 저장하지 못했다.",
+                "strategy_focus": "회고 결과 형식 점검",
+                "status": "error",
+            }
         if feedback.get("status") != "ok":
-            reason = str(feedback.get("reason", "알 수 없는 오류")).strip() or "알 수 없는 오류"
+            _trace_policy(
+                "llm_feedback_error",
+                hand_no=round_summary.get("hand_no"),
+                reason=feedback.get("reason", ""),
+            )
+            return feedback
+
+        validation_error = self._validate_feedback(round_summary, feedback)
+        if validation_error:
             _trace_policy(
                 "llm_feedback_rejected",
                 hand_no=round_summary.get("hand_no"),
-                reason=reason,
+                reason=validation_error,
+                short_term=feedback.get("short_term", ""),
+                long_term=feedback.get("long_term", ""),
+                strategy_focus=feedback.get("strategy_focus", ""),
             )
-            fallback = self._build_rule_feedback(round_summary)
-            fallback["status"] = "ok"
-            fallback["source"] = "rule_fallback"
-            fallback["llm_error"] = reason
-            return fallback
+            return {
+                "short_term": "정책 피드백 생성 실패: %s" % validation_error,
+                "long_term": "정책 피드백 생성이 실패해 이번 라운드 회고를 저장하지 못했다.",
+                "strategy_focus": "회고 검증 규칙 점검",
+                "status": "error",
+            }
+
+        feedback["source"] = "llm_feedback"
         return feedback
 
     def persist_feedback(self, round_summary, public_log, bot_mode):
@@ -178,7 +242,6 @@ class PolicyLoop:
         if feedback.get("status") == "error":
             return feedback
 
-        # 단기 기억과 장기 기억을 분리해 두면 다음 프롬프트에서 용도를 나누기 쉽다.
         self.memory_manager.append_feedback(
             bot_name,
             feedback["short_term"],

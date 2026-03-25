@@ -220,6 +220,12 @@ init python:
         match = ensure_poker_runtime()
         if match.bot_mode != "llm_npc":
             return True
+        if _llm_prewarm_state["started"] and not _llm_prewarm_state["done"]:
+            thread = _llm_prewarm_state["thread"]
+            if thread is not None and thread.is_alive():
+                thread.join()
+            store.poker_status_text = _llm_prewarm_state["status"]
+            return _llm_prewarm_state["ok"]
         if _llm_prewarm_state["done"]:
             store.poker_status_text = _llm_prewarm_state["status"]
             return _llm_prewarm_state["ok"]

@@ -5,7 +5,6 @@ from __future__ import annotations
 from backend.llm.client import QwenRuntimeClient
 from backend.llm.tasks import (
     build_action_task,
-    build_dialogue_task,
     build_draw_task,
     build_policy_task,
 )
@@ -33,7 +32,7 @@ def _error_reason(reason, fallback):
 
 class LocalLLMAgent:
     """
-    포커 엔진이 Qwen 런타임에 행동, 드로우, 대사, 회고를 요청하게 만드는 어댑터다.
+    포커 엔진이 Qwen 런타임에 행동, 드로우, 회고를 요청하게 만드는 어댑터다.
 
     Args:
         local_model_path: 로컬 모델 폴더 경로다.
@@ -117,6 +116,10 @@ class LocalLLMAgent:
         """
 
         task = build_action_task(match, legal_actions)
+        self.last_status = "행동 프롬프트 구성 완료 / 최근 전략 %d개 / 장기 기억 %d개" % (
+            len(task.context.get("recent_feedback", [])),
+            len(task.context.get("long_term_memory", [])),
+        )
         response = self.client.request(task.to_payload())
         if not isinstance(response, dict):
             self.last_status = "LLM 런타임 응답 형식이 올바르지 않습니다."
@@ -148,6 +151,10 @@ class LocalLLMAgent:
         """
 
         task = build_draw_task(match, max_discards)
+        self.last_status = "드로우 프롬프트 구성 완료 / 최근 전략 %d개 / 장기 기억 %d개" % (
+            len(task.context.get("recent_feedback", [])),
+            len(task.context.get("long_term_memory", [])),
+        )
         response = self.client.request(task.to_payload())
         if not isinstance(response, dict):
             self.last_status = "LLM 런타임 응답 형식이 올바르지 않습니다."
@@ -168,44 +175,6 @@ class LocalLLMAgent:
             "reason": str(response.get("reason") or "").strip() or "LLM이 카드 교체를 판단했습니다.",
         }
 
-    def generate_dialogue(self, match, event_name, result_summary=None):
-        """
-        현재 이벤트에 맞는 심리전 대사를 만든다.
-
-        Args:
-            match: 현재 포커 매치 객체다.
-            event_name: 대사 이벤트 이름이다.
-            result_summary: 라운드 종료 시 요약 문자열이다.
-
-        Returns:
-            대사 생성 결과 사전이다.
-        """
-
-        short_term = self.memory_manager.get_recent_feedback(match.bot.name, limit=5, long_term=False)
-        long_term = self.memory_manager.get_recent_feedback(match.bot.name, limit=5, long_term=True)
-        task = build_dialogue_task(
-            match,
-            event_name,
-            result_summary,
-            short_term,
-            long_term,
-            round_summary=getattr(match, "round_summary", None),
-        )
-        response = self.client.request(task.to_payload())
-        if not isinstance(response, dict):
-            self.last_status = "LLM 런타임 응답 형식이 올바르지 않습니다."
-            return {"status": "error", "reason": self.last_status}
-        if response.get("status") != "ok":
-            reason = _error_reason(response.get("reason", response.get("error")), "LLM 대사 생성 실패")
-            self.last_status = reason
-            return {"status": "error", "reason": reason}
-        self.last_status = "Qwen 런타임 요청 성공"
-
-        text = str(response.get("text") or "").strip()
-        if not text:
-            return {"status": "error", "reason": "LLM이 유효한 심리전 대사를 만들지 못했습니다."}
-        return {"status": "ok", "text": text, "reason": "LLM 대사 생성 성공"}
-
     def generate_policy_feedback(self, round_summary, public_log, bot_name):
         """
         방금 끝난 라운드를 회고해 다음 전략 문맥을 만든다.
@@ -222,6 +191,10 @@ class LocalLLMAgent:
         short_term = self.memory_manager.get_recent_feedback(bot_name, limit=5, long_term=False)
         long_term = self.memory_manager.get_recent_feedback(bot_name, limit=5, long_term=True)
         task = build_policy_task(round_summary, public_log, bot_name, short_term, long_term)
+        self.last_status = "회고 프롬프트 구성 완료 / 최근 전략 %d개 / 장기 기억 %d개" % (
+            len(task.context.get("recent_feedback", [])),
+            len(task.context.get("long_term_memory", [])),
+        )
         response = self.client.request(task.to_payload())
         if not isinstance(response, dict):
             self.last_status = "LLM 런타임 응답 형식이 올바르지 않습니다."

@@ -16,7 +16,6 @@ from backend.config import load_backend_config
 from backend.llm.client import QwenRuntimeClient
 from backend.llm.prompts import (
     build_action_prompt,
-    build_dialogue_prompt,
     build_draw_prompt,
     build_policy_feedback_prompt,
 )
@@ -57,7 +56,7 @@ def build_context():
 
 def build_payloads():
     """
-    대사, 행동, 카드 교체, 회고 요청을 한 번에 검증할 수 있도록 요청 사전을 만든다.
+    행동, 카드 교체, 회고 요청을 한 번에 검증할 수 있도록 요청 사전을 만든다.
 
     Returns:
         런타임 IPC에 바로 보낼 요청 사전 목록이다.
@@ -65,22 +64,6 @@ def build_payloads():
 
     context = build_context()
     return [
-        {
-            "name": "dialogue",
-            "payload": {
-                "mode": "dialogue",
-                "prompt": build_dialogue_prompt(
-                    event_name="match_intro",
-                    recent_log=context["recent_log"],
-                    result_summary=None,
-                    player_name="플레이어",
-                    bot_name="사야",
-                ),
-                "context": context,
-                "event_name": "match_intro",
-                "max_new_tokens": 64,
-            },
-        },
         {
             "name": "action",
             "payload": {
@@ -133,7 +116,7 @@ def build_client():
 def main():
     """
     게임을 켜지 않고 현재 런타임의 핵심 추론 경로를 직접 점검한다.
-    런타임 시작 여부를 먼저 확인하고, 시작되면 대사·행동·교체·회고 요청을 차례대로 보내 결과를 JSON으로 출력한다.
+    런타임 시작 여부를 먼저 확인하고, 시작되면 행동·교체·회고 요청을 차례대로 보내 결과를 JSON으로 출력한다.
 
     Returns:
         모든 요청이 성공하면 0, 하나라도 실패하면 1을 반환한다.
@@ -142,7 +125,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--only",
-        choices=["dialogue", "action", "draw", "policy"],
+        choices=["action", "draw", "policy"],
         help="특정 요청 하나만 실행한다.",
     )
     args = parser.parse_args()
