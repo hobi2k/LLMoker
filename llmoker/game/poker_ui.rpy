@@ -245,7 +245,10 @@ screen poker_table_screen(mode="betting_open"):
                         spacing 3
                         text "팟" size gui_scale(13) color "#89b6ff" font "fonts/malgunbd.ttf"
                         text "[get_poker_match().pot]칩" size gui_scale(23) color "#f5f5f5" font "fonts/malgunbd.ttf"
-                        text "현재 판의 리스크와 베팅 흐름을 보여줍니다." size gui_scale(14) color "#c8d6f0" font "fonts/malgun.ttf" xmaximum gui_scale(240)
+                        if get_poker_match().current_bet > 0:
+                            text "현재 베팅액: [get_poker_match().current_bet]칩" size gui_scale(14) color "#c8d6f0" font "fonts/malgun.ttf" xmaximum gui_scale(240)
+                        else:
+                            text "베팅 없음" size gui_scale(14) color "#c8d6f0" font "fonts/malgun.ttf" xmaximum gui_scale(240)
 
                     vbox:
                         spacing 3
@@ -258,7 +261,10 @@ screen poker_table_screen(mode="betting_open"):
                         spacing 3
                         text "상대 AI" size gui_scale(13) color "#89b6ff" font "fonts/malgunbd.ttf"
                         text "[get_poker_match().get_bot_mode_label()]" size gui_scale(18) color "#9ed6ff" font "fonts/malgunbd.ttf"
-                        text "상대의 성향과 현재 상태를 확인하세요." size gui_scale(14) color "#c8d6f0" font "fonts/malgun.ttf" xmaximum gui_scale(220)
+                        if get_poker_match().get_last_action_reason_text():
+                            text "[get_poker_match().get_last_action_reason_text()]" size gui_scale(13) color "#c8d6f0" font "fonts/malgun.ttf" xmaximum gui_scale(220) line_spacing 2
+                        else:
+                            text "[get_poker_match().get_llm_status_text()]" size gui_scale(13) color "#c8d6f0" font "fonts/malgun.ttf" xmaximum gui_scale(220)
 
     if mode == "round_end":
         frame:
@@ -434,23 +440,23 @@ screen poker_table_screen(mode="betting_open"):
                     if mode == "betting":
                         if "check" in get_poker_match().get_player_available_actions():
                             textbutton "체크":
-                                style "poker_dock_button"
+                                style "poker_action_button"
                                 action Return("check")
                         if "bet" in get_poker_match().get_player_available_actions():
                             textbutton "베팅 [get_poker_match().config.fixed_bet]칩":
-                                style "poker_dock_button"
+                                style "poker_bet_button"
                                 action Return("bet")
                         if "call" in get_poker_match().get_player_available_actions():
                             textbutton "콜 [get_poker_match().get_player_amount_to_call()]칩":
-                                style "poker_dock_button"
+                                style "poker_action_button"
                                 action Return("call")
                         if "raise" in get_poker_match().get_player_available_actions():
                             textbutton "레이즈 [get_poker_match().get_raise_total_amount()]칩":
-                                style "poker_dock_button"
+                                style "poker_bet_button"
                                 action Return("raise")
                     elif mode == "draw":
                         textbutton "교체 확정":
-                            style "poker_dock_button"
+                            style "poker_action_button"
                             action Return("confirm")
                         textbutton "교체 없이 진행":
                             style "poker_dock_button"
@@ -459,7 +465,7 @@ screen poker_table_screen(mode="betting_open"):
                     hbox:
                         xalign 0.5
                         textbutton "폴드":
-                            style "poker_dock_button"
+                            style "poker_fold_button"
                             action Return("fold")
 
         frame:
@@ -508,3 +514,33 @@ style poker_dock_button_text:
     size gui_scale(17)
     color "#f4f4f4"
     hover_color "#ffffff"
+
+style poker_action_button is poker_dock_button:
+    padding (gui_scale(12), gui_scale(8))
+    background "#15304ae8"
+    hover_background "#1e4870f8"
+
+style poker_action_button_text is poker_dock_button_text:
+    size gui_scale(18)
+    color "#c8e8ff"
+    hover_color "#ffffff"
+
+style poker_bet_button is poker_dock_button:
+    padding (gui_scale(12), gui_scale(8))
+    background "#2a2410e0"
+    hover_background "#3d3518f0"
+
+style poker_bet_button_text is poker_dock_button_text:
+    size gui_scale(18)
+    color "#ffe8a0"
+    hover_color "#fff5cc"
+
+style poker_fold_button is poker_dock_button:
+    padding (gui_scale(12), gui_scale(8))
+    background "#2a1010e0"
+    hover_background "#3d1818f0"
+
+style poker_fold_button_text is poker_dock_button_text:
+    size gui_scale(18)
+    color "#ffaaaa"
+    hover_color "#ffcccc"

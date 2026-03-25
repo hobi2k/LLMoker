@@ -294,7 +294,7 @@ init python:
             sync_poker_match_state()
             return messages
         except RuntimeError as exc:
-            store.poker_fatal_error_text = str(exc)
+            store.poker_fatal_error_text = str(exc).replace("{", "{{").replace("}", "}}")
             return ["오류: %s" % exc]
 
     def safe_resolve_draw_phase(selected_discards):
@@ -313,7 +313,7 @@ init python:
             sync_poker_match_state()
             return messages
         except RuntimeError as exc:
-            store.poker_fatal_error_text = str(exc)
+            store.poker_fatal_error_text = str(exc).replace("{", "{{").replace("}", "}}")
             return ["오류: %s" % exc]
 
     def player_card_path(card, state="idle"):

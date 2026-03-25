@@ -337,7 +337,9 @@ screen navigation():
 
         if main_menu:
 
-            textbutton "시작" action Start()
+            textbutton "시작":
+                style "navigation_start_button"
+                action Start()
 
         else:
 
@@ -392,6 +394,18 @@ style navigation_button_text:
     color "#e7f3ff"
     hover_color "#ffffff"
     outlines [(1, "#071019", 0, 0)]
+
+style navigation_start_button is navigation_button:
+    background "#162e4ae8"
+    hover_background "#1e4a70f0"
+    top_padding gui_scale(13)
+    bottom_padding gui_scale(13)
+
+style navigation_start_button_text is navigation_button_text:
+    size gui_scale(26)
+    color "#c8eeff"
+    hover_color "#ffffff"
+    outlines [(1, "#071019", 0, 0), (2, "#2288cc22", 0, 0)]
 
 
 ## Main Menu screen ############################################################

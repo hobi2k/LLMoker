@@ -121,7 +121,7 @@ def build_action_task(match, legal_actions):
         context=context,
         metadata={
             "legal_actions": legal_actions,
-            "max_new_tokens": 64,
+            "max_new_tokens": 128,
         },
     )
 
@@ -156,14 +156,96 @@ def build_draw_task(match, max_discards):
         context=context,
         metadata={
             "max_discards": max_discards,
-            "max_new_tokens": 64,
+            "max_new_tokens": 128,
         },
     )
 
 
+def _get_dialogue_key(event_name, result_summary, recent_log, round_summary, match):
+    """
+    현재 게임 상태에서 dialogue_lines.yaml 조회에 쓸 키를 결정한다.
+
+    Args:
+        event_name: 현재 대사 이벤트 이름이다.
+        result_summary: 라운드 종료 요약 문자열이다.
+        recent_log: 최근 공개 로그 목록이다.
+        round_summary: 라운드 결과 요약 사전이다.
+        match: 현재 포커 매치 객체다.
+
+    Returns:
+        YAML 키 문자열이다.
+    """
+
+    if event_name == "match_intro":
+        return "match_intro"
+    if event_name == "round_start":
+        return "round_start"
+    if event_name == "draw":
+        return "draw"
+    if event_name in ("round_end", "match_end"):
+        winner = (round_summary or {}).get("winner", "") if isinstance(round_summary, dict) else ""
+        if winner == match.bot.name:
+            return "%s_win" % event_name
+        if winner == match.player.name:
+            return "%s_lose" % event_name
+        return "%s_draw" % event_name
+    if event_name == "betting":
+        latest = " ".join(str(recent_log[-1] or "").split()) if recent_log else ""
+        if "체크" in latest:
+            return "betting_check"
+        if "베팅" in latest:
+            return "betting_bet"
+        if "콜" in latest:
+            return "betting_call"
+        if "레이즈" in latest:
+            return "betting_raise"
+        if "폴드" in latest:
+            return "betting_neutral"
+        return "betting_neutral"
+    return "round_start"
+
+
+def _build_situation_text(event_name, dialogue_key, result_summary, recent_log, match):
+    """
+    LLM이 대사 번호를 고를 때 참고할 짧은 상황 설명 문자열을 만든다.
+
+    Args:
+        event_name: 현재 대사 이벤트 이름이다.
+        dialogue_key: YAML 조회 키다.
+        result_summary: 라운드 종료 요약 문자열이다.
+        recent_log: 최근 공개 로그 목록이다.
+        match: 현재 포커 매치 객체다.
+
+    Returns:
+        한 문장 상황 설명 문자열이다.
+    """
+
+    if result_summary:
+        return str(result_summary).strip()
+    if recent_log:
+        return str(recent_log[-1] or "").strip()
+    defaults = {
+        "match_intro": "매치가 막 시작됐다.",
+        "round_start": "새 라운드가 막 열렸다.",
+        "draw": "드로우 타이밍이 왔다.",
+        "betting_check": "상대가 체크했다.",
+        "betting_bet": "상대가 베팅했다.",
+        "betting_call": "상대가 콜했다.",
+        "betting_raise": "상대가 레이즈했다.",
+        "betting_neutral": "상대가 방금 행동을 골랐다.",
+        "round_end_win": "사야가 이겼다.",
+        "round_end_lose": "사야가 졌다.",
+        "round_end_draw": "무승부다.",
+        "match_end_win": "사야가 매치에서 이겼다.",
+        "match_end_lose": "사야가 매치에서 졌다.",
+    }
+    return defaults.get(dialogue_key, "포커 판이 진행 중이다.")
+
+
 def build_dialogue_task(match, event_name, result_summary, recent_feedback, long_term_memory, round_summary=None):
     """
-    심리전 대사를 생성하게 할 작업을 만든다.
+    대사 풀에서 상황에 맞는 대사를 선택하게 할 작업을 만든다.
+    LLM은 select_dialogue_line 도구로 번호만 고른다.
 
     Args:
         match: 현재 포커 매치 객체다.
@@ -171,50 +253,26 @@ def build_dialogue_task(match, event_name, result_summary, recent_feedback, long
         result_summary: 라운드 종료 시 요약 문자열이다.
         recent_feedback: 단기 기억 목록이다.
         long_term_memory: 장기 기억 목록이다.
+        round_summary: 라운드 결과 요약 사전이다.
 
     Returns:
-        대사 생성용 `PokerAgentTask`다.
+        대사 선택용 `PokerAgentTask`다.
     """
 
     recent_public_log = match.get_public_log_lines()
     recent_log_lines = []
     for line in recent_public_log:
         recent_log_lines.append(" ".join(str(line or "").split()))
-    public_state_text = build_dialogue_state_text(match)
-    emotion_hint = None
-    active_round_summary = round_summary if isinstance(round_summary, dict) else getattr(match, "round_summary", None)
-    if event_name in ("round_end", "match_end") and isinstance(active_round_summary, dict):
-        winner = active_round_summary.get("winner")
-        if winner == match.bot.name:
-            emotion_hint = "방금 이겼다. 짧게 기쁨이나 우쭐함을 드러내되 상대에게 바로 말한다."
-        elif winner == match.player.name:
-            emotion_hint = "방금 졌다. 짧게 분함이나 짜증을 드러내되 상대에게 바로 말한다."
-        elif winner == "무승부":
-            emotion_hint = "무승부라 담담하지만 아쉬움이 남는다."
-    elif event_name == "betting":
-        emotion_hint = "상대가 방금 고른 행동을 두고 바로 압박하거나 비꼰다."
-    elif event_name == "draw":
-        emotion_hint = "드로우 타이밍에서 상대를 흔드는 말을 한다."
 
-    prompt = "\n".join(
-        [
-            build_dialogue_prompt(
-                event_name=event_name,
-                recent_log=recent_log_lines,
-                result_summary=result_summary,
-                player_name=match.player.name,
-                bot_name=match.bot.name,
-                emotion_hint=emotion_hint,
-            ),
-            "설명하지 말고 바로 그 한마디만 말한다.",
-        ]
-    )
+    active_round_summary = round_summary if isinstance(round_summary, dict) else getattr(match, "round_summary", None)
+    dialogue_key = _get_dialogue_key(event_name, result_summary, recent_log_lines, active_round_summary, match)
+    situation_text = _build_situation_text(event_name, dialogue_key, result_summary, recent_log_lines, match)
 
     return PokerAgentTask(
         mode="dialogue",
-        prompt=prompt,
+        prompt=situation_text,
         context={
-            "public_state": public_state_text,
+            "public_state": build_dialogue_state_text(match),
             "recent_feedback": recent_feedback,
             "long_term_memory": long_term_memory,
             "recent_log": recent_log_lines,
@@ -224,7 +282,9 @@ def build_dialogue_task(match, event_name, result_summary, recent_feedback, long
         },
         metadata={
             "event_name": event_name,
-            "max_new_tokens": 80,
+            "dialogue_key": dialogue_key,
+            "situation": situation_text,
+            "max_new_tokens": 32,
         },
     )
 

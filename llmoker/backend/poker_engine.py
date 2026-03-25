@@ -277,6 +277,20 @@ class PokerMatch:
 
         return self.llm_agent.last_status.replace("{", "{{").replace("}", "}}")
 
+    def get_last_action_reason_text(self):
+        """
+        사야의 마지막 행동 이유를 Ren'Py 화면에 안전하게 올릴 문자열로 돌려준다.
+        Ren'Py 텍스트 태그로 오해될 수 있는 중괄호와 대괄호를 이스케이프한다.
+
+        Returns:
+            이스케이프된 마지막 행동 이유 문자열이다. 이유가 없으면 빈 문자열을 반환한다.
+        """
+
+        text = (self.last_llm_reason or "").strip()
+        if not text:
+            return ""
+        return text.replace("{", "{{").replace("}", "}}").replace("[", "[[").replace("]", "]]")
+
     def get_llm_runtime_label(self):
         """
         현재 LLM NPC 실행 방식을 화면에서 읽기 쉬운 라벨로 돌려준다.
