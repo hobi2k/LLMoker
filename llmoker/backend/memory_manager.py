@@ -2,7 +2,7 @@ import json
 import os
 from datetime import datetime
 
-from backend.sqlite_compat import sqlite
+from backend.sqlite_compat import SQLITE_AVAILABLE, sqlite
 
 
 class MemoryManager:
@@ -19,6 +19,20 @@ class MemoryManager:
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self._initialize_db()
 
+    def _load_json_entries(self):
+        if not os.path.isfile(self.db_path):
+            return []
+        try:
+            with open(self.db_path, "r", encoding="utf-8") as handle:
+                payload = json.load(handle)
+        except (OSError, json.JSONDecodeError):
+            return []
+        return payload if isinstance(payload, list) else []
+
+    def _write_json_entries(self, entries):
+        with open(self.db_path, "w", encoding="utf-8") as handle:
+            json.dump(entries, handle, ensure_ascii=False, indent=2)
+
     def _connect(self):
         """
         현재 기억 데이터베이스 파일에 대한 새 SQLite 연결을 연다.
@@ -28,6 +42,8 @@ class MemoryManager:
             현재 기억 DB 연결 객체다.
         """
 
+        if not SQLITE_AVAILABLE:
+            raise RuntimeError("SQLite 드라이버를 사용할 수 없습니다.")
         return sqlite.connect(self.db_path)
 
     def _initialize_db(self):
@@ -35,6 +51,11 @@ class MemoryManager:
         기억 저장 테이블이 없으면 만든다.
         스키마 보장만 담당하며, 이미 테이블이 있을 때는 데이터에 손대지 않는다.
         """
+
+        if not SQLITE_AVAILABLE:
+            if not os.path.isfile(self.db_path):
+                self._write_json_entries([])
+            return
 
         with self._connect() as connection:
             connection.execute(
@@ -65,6 +86,20 @@ class MemoryManager:
 
         memory_scope = "long_term" if long_term else "short_term"
         created_at = datetime.utcnow().isoformat()
+        if not SQLITE_AVAILABLE:
+            entries = self._load_json_entries()
+            entries.append(
+                {
+                    "character_name": character_name,
+                    "memory_scope": memory_scope,
+                    "text": text,
+                    "metadata": metadata or {},
+                    "created_at": created_at,
+                }
+            )
+            self._write_json_entries(entries)
+            return
+
         with self._connect() as connection:
             connection.execute(
                 """
@@ -93,6 +128,23 @@ class MemoryManager:
         """
 
         memory_scope = "long_term" if long_term else "short_term"
+        if not SQLITE_AVAILABLE:
+            entries = self._load_json_entries()
+            rows = [
+                entry
+                for entry in entries
+                if entry.get("character_name") == character_name and entry.get("memory_scope") == memory_scope
+            ]
+            return [
+                {
+                    "character": character_name,
+                    "text": row.get("text", ""),
+                    "timestamp": row.get("created_at", ""),
+                    "metadata": row.get("metadata", {}) or {},
+                }
+                for row in rows
+            ]
+
         with self._connect() as connection:
             rows = connection.execute(
                 """
@@ -154,6 +206,10 @@ class MemoryManager:
         저장을 불러오지 않고 새 게임을 시작할 때 이전 세션 기억이 남지 않게 하는 용도다.
         """
 
+        if not SQLITE_AVAILABLE:
+            self._write_json_entries([])
+            return
+
         with self._connect() as connection:
             connection.execute("DELETE FROM memory_entry")
 
@@ -168,6 +224,35 @@ class MemoryManager:
 
         short_term_items = list((memory_snapshot or {}).get("short_term", []))
         long_term_items = list((memory_snapshot or {}).get("long_term", []))
+
+        if not SQLITE_AVAILABLE:
+            entries = [
+                entry
+                for entry in self._load_json_entries()
+                if entry.get("character_name") != character_name
+            ]
+            for item in short_term_items:
+                entries.append(
+                    {
+                        "character_name": character_name,
+                        "memory_scope": "short_term",
+                        "text": item.get("text", ""),
+                        "metadata": item.get("metadata", {}) or {},
+                        "created_at": item.get("timestamp") or datetime.utcnow().isoformat(),
+                    }
+                )
+            for item in long_term_items:
+                entries.append(
+                    {
+                        "character_name": character_name,
+                        "memory_scope": "long_term",
+                        "text": item.get("text", ""),
+                        "metadata": item.get("metadata", {}) or {},
+                        "created_at": item.get("timestamp") or datetime.utcnow().isoformat(),
+                    }
+                )
+            self._write_json_entries(entries)
+            return
 
         with self._connect() as connection:
             connection.execute("DELETE FROM memory_entry WHERE character_name = ?", (character_name,))

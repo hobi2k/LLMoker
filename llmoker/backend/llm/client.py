@@ -16,6 +16,7 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 LOG_DIR = ROOT_DIR / "data" / "logs"
 RUNTIME_LOG_PATH = LOG_DIR / "qwen_runtime.log"
 RUNTIME_PID_PATH = LOG_DIR / "qwen_runtime.pid"
+REQUIREMENTS_PATH = ROOT_DIR.parent / "requirements.txt"
 
 
 class QwenRuntimeClient:
@@ -87,6 +88,118 @@ class QwenRuntimeClient:
             self.runtime_python,
             self.device,
         )
+
+    def _venv_python_path(self):
+        if os.name == "nt":
+            return str(ROOT_DIR / ".venv" / "Scripts" / "python.exe")
+        return str(ROOT_DIR / ".venv" / "bin" / "python")
+
+    def _bootstrap_python_candidates(self):
+        candidates = [self.runtime_python]
+        if os.name == "nt":
+            candidates.append(str(ROOT_DIR / "lib" / "py3-windows-x86_64" / "python.exe"))
+            candidates.append("python")
+        else:
+            candidates.append(str(ROOT_DIR / "lib" / "py3-linux-x86_64" / "python"))
+            candidates.append("python3")
+        return candidates
+
+    def _pick_bootstrap_python(self):
+        for candidate in self._bootstrap_python_candidates():
+            if not candidate:
+                continue
+            if os.path.isfile(candidate):
+                return candidate
+            if os.path.sep not in candidate:
+                return candidate
+        return None
+
+    def _run_bootstrap_command(self, command):
+        env = os.environ.copy()
+        env["PYTHONPATH"] = str(ROOT_DIR)
+        subprocess.check_call(command, cwd=str(ROOT_DIR), env=env)
+
+    def _ensure_runtime_virtualenv(self):
+        venv_python = self._venv_python_path()
+        if os.path.isfile(venv_python):
+            self.runtime_python = venv_python
+            return True
+
+        bootstrap_python = self._pick_bootstrap_python()
+        if not bootstrap_python:
+            self.last_status = "LLM 런타임용 Python을 찾을 수 없습니다."
+            return False
+
+        try:
+            self._run_bootstrap_command([bootstrap_python, "-m", "venv", str(ROOT_DIR / ".venv")])
+        except Exception as exc:
+            self.last_status = f"LLM 가상환경 생성 실패: {exc}"
+            return False
+
+        if not os.path.isfile(venv_python):
+            self.last_status = "LLM 가상환경 생성 후 Python 실행 파일을 찾지 못했습니다."
+            return False
+
+        self.runtime_python = venv_python
+        return True
+
+    def _ensure_runtime_pip(self):
+        try:
+            self._run_bootstrap_command([self.runtime_python, "-m", "pip", "--version"])
+            return True
+        except Exception:
+            pass
+
+        try:
+            self._run_bootstrap_command([self.runtime_python, "-m", "ensurepip", "--upgrade"])
+            return True
+        except Exception as exc:
+            self.last_status = f"pip 준비 실패: {exc}"
+            return False
+
+    def _has_required_runtime_packages(self):
+        try:
+            self._run_bootstrap_command(
+                [
+                    self.runtime_python,
+                    "-c",
+                    (
+                        "import importlib.metadata as m; "
+                        "req={'qwen-agent':'0.0.34','transformers':'4.57.3'}; "
+                        "mods=['numpy','pydantic','dateutil','qwen_agent','soundfile','torch','torchaudio','torchvision']; "
+                        "import importlib.util as u; "
+                        "missing=[name for name in mods if u.find_spec(name) is None]; "
+                        "missing += [k for k,v in req.items() if m.version(k) != v]; "
+                        "raise SystemExit(0 if not missing else 1)"
+                    ),
+                ]
+            )
+            return True
+        except Exception:
+            return False
+
+    def _ensure_runtime_dependencies(self):
+        if self._has_required_runtime_packages():
+            return True
+        try:
+            self._run_bootstrap_command([self.runtime_python, "-m", "pip", "install", "-r", str(REQUIREMENTS_PATH)])
+            return True
+        except Exception as exc:
+            self.last_status = f"LLM 의존성 설치 실패: {exc}"
+            return False
+
+    def _ensure_model_files(self):
+        if self.has_model_files():
+            return True
+        try:
+            self._run_bootstrap_command([self.runtime_python, "-m", "backend.llm.model_bootstrap"])
+        except Exception as exc:
+            self.last_status = f"LLM 모델 다운로드 실패: {exc}"
+            return False
+        if self.has_model_files():
+            return True
+        self.last_status = self.missing_model_message()
+        return False
 
     def has_model_files(self):
         """
@@ -198,8 +311,16 @@ class QwenRuntimeClient:
             준비 성공 여부다.
         """
 
-        if not self.has_model_files():
-            self.last_status = self.missing_model_message()
+        if not self._ensure_runtime_virtualenv():
+            return False
+
+        if not self._ensure_runtime_pip():
+            return False
+
+        if not self._ensure_runtime_dependencies():
+            return False
+
+        if not self._ensure_model_files():
             return False
 
         if self.is_running():

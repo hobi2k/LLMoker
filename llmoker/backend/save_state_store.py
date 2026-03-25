@@ -2,7 +2,7 @@ import json
 import os
 from datetime import datetime
 
-from backend.sqlite_compat import sqlite
+from backend.sqlite_compat import SQLITE_AVAILABLE, sqlite
 
 
 class SaveStateStore:
@@ -19,6 +19,20 @@ class SaveStateStore:
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self._initialize_db()
 
+    def _load_json_slots(self):
+        if not os.path.isfile(self.db_path):
+            return {}
+        try:
+            with open(self.db_path, "r", encoding="utf-8") as handle:
+                payload = json.load(handle)
+        except (OSError, json.JSONDecodeError):
+            return {}
+        return payload if isinstance(payload, dict) else {}
+
+    def _write_json_slots(self, slot_map):
+        with open(self.db_path, "w", encoding="utf-8") as handle:
+            json.dump(slot_map, handle, ensure_ascii=False, indent=2)
+
     def _connect(self):
         """
         현재 세이브 데이터베이스 파일에 대한 새 SQLite 연결을 연다.
@@ -28,6 +42,8 @@ class SaveStateStore:
             현재 세이브 DB 연결 객체다.
         """
 
+        if not SQLITE_AVAILABLE:
+            raise RuntimeError("SQLite 드라이버를 사용할 수 없습니다.")
         return sqlite.connect(self.db_path)
 
     def _initialize_db(self):
@@ -35,6 +51,11 @@ class SaveStateStore:
         세이브 슬롯 테이블이 아직 없으면 생성한다.
         앱 시작 시 여러 번 호출돼도 같은 스키마만 보장하고 추가 부작용은 만들지 않는다.
         """
+
+        if not SQLITE_AVAILABLE:
+            if not os.path.isfile(self.db_path):
+                self._write_json_slots({})
+            return
 
         with self._connect() as connection:
             connection.execute(
@@ -62,6 +83,17 @@ class SaveStateStore:
 
         payload = json.dumps(snapshot, ensure_ascii=False)
         updated_at = datetime.utcnow().isoformat()
+        if not SQLITE_AVAILABLE:
+            slot_map = self._load_json_slots()
+            slot_map[str(slot)] = {
+                "slot": slot,
+                "label": label,
+                "payload": snapshot,
+                "updated_at": updated_at,
+            }
+            self._write_json_slots(slot_map)
+            return
+
         with self._connect() as connection:
             connection.execute(
                 """
@@ -86,6 +118,11 @@ class SaveStateStore:
             스냅샷 사전 또는 None이다.
         """
 
+        if not SQLITE_AVAILABLE:
+            slot_map = self._load_json_slots()
+            entry = slot_map.get(str(slot))
+            return None if not entry else entry.get("payload")
+
         with self._connect() as connection:
             row = connection.execute(
                 "SELECT payload FROM save_state WHERE slot = ?",
@@ -105,6 +142,17 @@ class SaveStateStore:
         """
 
         slot_map = {slot: {"slot": slot, "label": "빈 슬롯", "updated_at": ""} for slot in range(1, 4)}
+        if not SQLITE_AVAILABLE:
+            stored = self._load_json_slots()
+            for key, entry in stored.items():
+                slot = int(key)
+                slot_map[slot] = {
+                    "slot": slot,
+                    "label": entry.get("label", "빈 슬롯"),
+                    "updated_at": entry.get("updated_at", ""),
+                }
+            return [slot_map[slot] for slot in sorted(slot_map)]
+
         with self._connect() as connection:
             rows = connection.execute(
                 "SELECT slot, label, updated_at FROM save_state ORDER BY slot"

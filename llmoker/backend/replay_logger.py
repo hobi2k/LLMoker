@@ -2,7 +2,7 @@ import json
 import os
 from datetime import datetime
 
-from backend.sqlite_compat import sqlite
+from backend.sqlite_compat import SQLITE_AVAILABLE, sqlite
 
 
 class ReplayLogger:
@@ -19,6 +19,20 @@ class ReplayLogger:
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self._initialize_db()
 
+    def _load_json_rows(self):
+        if not os.path.isfile(self.db_path):
+            return []
+        try:
+            with open(self.db_path, "r", encoding="utf-8") as handle:
+                payload = json.load(handle)
+        except (OSError, json.JSONDecodeError):
+            return []
+        return payload if isinstance(payload, list) else []
+
+    def _write_json_rows(self, rows):
+        with open(self.db_path, "w", encoding="utf-8") as handle:
+            json.dump(rows, handle, ensure_ascii=False, indent=2)
+
     def _connect(self):
         """
         현재 리플레이 데이터베이스 파일에 대한 새 SQLite 연결을 연다.
@@ -28,6 +42,8 @@ class ReplayLogger:
             `sqlite3.Connection` 객체다.
         """
 
+        if not SQLITE_AVAILABLE:
+            raise RuntimeError("SQLite 드라이버를 사용할 수 없습니다.")
         return sqlite.connect(self.db_path)
 
     def _initialize_db(self):
@@ -35,6 +51,11 @@ class ReplayLogger:
         리플레이 저장용 테이블이 없을 때만 생성한다.
         런타임 초기화 시 안전하게 여러 번 호출될 수 있도록 idempotent하게 유지한다.
         """
+
+        if not SQLITE_AVAILABLE:
+            if not os.path.isfile(self.db_path):
+                self._write_json_rows([])
+            return
 
         with self._connect() as connection:
             connection.execute(
@@ -62,6 +83,20 @@ class ReplayLogger:
 
         payload = dict(summary)
         created_at = datetime.utcnow().isoformat()
+        if not SQLITE_AVAILABLE:
+            rows = self._load_json_rows()
+            rows.append(
+                {
+                    "hand_no": payload["hand_no"],
+                    "winner": payload["winner"],
+                    "pot": payload["pot"],
+                    "payload": payload,
+                    "created_at": created_at,
+                }
+            )
+            self._write_json_rows(rows)
+            return
+
         with self._connect() as connection:
             connection.execute(
                 """

@@ -79,6 +79,7 @@ ensure_runner_dependencies() {
     fi
 
     if ! "$RUNNER_PYTHON" - <<'PY' >/dev/null 2>&1
+import importlib.metadata
 import importlib.util
 required = (
     "numpy",
@@ -92,6 +93,16 @@ required = (
     "transformers",
 )
 missing = [name for name in required if importlib.util.find_spec(name) is None]
+versions = {
+    "qwen-agent": "0.0.34",
+    "transformers": "4.57.3",
+}
+for package_name, expected_version in versions.items():
+    try:
+        if importlib.metadata.version(package_name) != expected_version:
+            missing.append(package_name)
+    except importlib.metadata.PackageNotFoundError:
+        missing.append(package_name)
 raise SystemExit(0 if not missing else 1)
 PY
     then

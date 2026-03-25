@@ -54,9 +54,23 @@ def load_backend_config(base_dir):
     local_llm_path = os.environ.get("LOCAL_LLM_PATH", default_model_path)
     default_model_name = os.path.basename(local_llm_path.rstrip(os.sep)) or "Qwen3-4B-Instruct-2507"
     llm_model_name = os.environ.get("LLM_MODEL_NAME", default_model_name)
-    default_runtime_python = os.path.join(base_dir, ".venv", "bin", "python")
-    if not os.path.isfile(default_runtime_python):
-        default_runtime_python = "python3"
+    if os.name == "nt":
+        runtime_candidates = [
+            os.path.join(base_dir, ".venv", "Scripts", "python.exe"),
+            os.path.join(base_dir, "lib", "py3-windows-x86_64", "python.exe"),
+            "python",
+        ]
+    else:
+        runtime_candidates = [
+            os.path.join(base_dir, ".venv", "bin", "python"),
+            os.path.join(base_dir, "lib", "py3-linux-x86_64", "python"),
+            "python3",
+        ]
+
+    default_runtime_python = next(
+        (candidate for candidate in runtime_candidates if os.path.isfile(candidate) or os.path.sep not in candidate),
+        "python3",
+    )
     llm_runtime_python = os.environ.get("LLM_RUNTIME_PYTHON", default_runtime_python)
     llm_device = os.environ.get("LLM_DEVICE", "auto")
     memory_db_path = os.environ.get(
