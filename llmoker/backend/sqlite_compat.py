@@ -43,7 +43,16 @@ def _preload_vendor_sqlite_library(vendor_dir):
             continue
         library_path = os.path.join(libs_dir, filename)
         try:
-            ctypes.CDLL(library_path, mode=getattr(ctypes, "RTLD_GLOBAL", os.RTLD_GLOBAL))
+            if os.name == "nt":
+                ctypes.CDLL(library_path)
+            else:
+                rtld_global = getattr(ctypes, "RTLD_GLOBAL", None)
+                if rtld_global is None:
+                    rtld_global = getattr(os, "RTLD_GLOBAL", None)
+                if rtld_global is None:
+                    ctypes.CDLL(library_path)
+                else:
+                    ctypes.CDLL(library_path, mode=rtld_global)
         except OSError:
             continue
         return
