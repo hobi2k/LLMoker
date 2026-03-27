@@ -106,6 +106,44 @@ class QwenRuntimeClient:
 
     def _download_file(self, url, destination):
         destination.parent.mkdir(parents=True, exist_ok=True)
+        if os.name == "nt":
+            curl_command = ["curl.exe", "-L", url, "-o", str(destination)]
+            try:
+                subprocess.check_call(
+                    curl_command,
+                    cwd=str(ROOT_DIR),
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                if destination.is_file() and destination.stat().st_size > 0:
+                    return
+            except Exception:
+                pass
+
+            powershell_command = [
+                "powershell",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                (
+                    "[Net.ServicePointManager]::SecurityProtocol = "
+                    "[Net.SecurityProtocolType]::Tls12; "
+                    f"Invoke-WebRequest -Uri '{url}' -OutFile '{destination}'"
+                ),
+            ]
+            try:
+                subprocess.check_call(
+                    powershell_command,
+                    cwd=str(ROOT_DIR),
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                if destination.is_file() and destination.stat().st_size > 0:
+                    return
+            except Exception:
+                pass
+
         with urllib.request.urlopen(url) as response, open(destination, "wb") as handle:
             handle.write(response.read())
 
