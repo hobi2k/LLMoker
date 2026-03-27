@@ -1,43 +1,44 @@
-2026-03-27 06:02:39 UTC
+2026-03-27 07:16:11 UTC
 Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39
 Ren'Py 8.2.1.24030407
 
-Early init took 0.02s
+Early init took 0.03s
 Loading error handling took 0.02s
 Loading script took 0.04s
-Loading save slot metadata took 0.01s
+Loading save slot metadata took 0.02s
 Loading persistent took 0.00s
 Set script version to: (8, 2, 1)
-Running init code took 0.03s
+Running init code took 0.04s
 Loading analysis data took 0.01s
 Analyze and compile ATL took 0.00s
-Reloading save slot metadata took 0.00s
+Reloading save slot metadata took 0.01s
 Index archives took 0.00s
 Dump and make backups took 0.00s
 Cleaning cache took 0.00s
 Making clean stores took 0.00s
-Initial gc took 0.03s
+Initial gc took 0.02s
 DPI scale factor: 1.000000
 Creating interface object took 0.00s
 Cleaning stores took 0.00s
 Init translation took 0.02s
 Build styles took 0.00s
-Load screen analysis took 0.02s
+Load screen analysis took 0.01s
 Analyze screens took 0.00s
 Save screen analysis took 0.00s
-Prepare screens took 0.04s
+Prepare screens took 0.03s
 Save pyanalysis. took 0.00s
 Save bytecode. took 0.00s
-﻿Ren'Py 8.2.1.24030407 lint report, generated at: Fri Mar 27 15:02:39 2026
+Running _start took 0.00s
+Interface start took 0.88s
 
-
-Statistics:
-
-The game contains 3 dialogue blocks, containing 10 words and 61 characters,
-for an average of 3.3 words and 20 characters per block.
-
-The game contains 0 menus, 4 images, and 27 screens.
-
-
-Lint is not a substitute for thorough testing. Remember to update Ren'Py
-before releasing. New releases fix bugs and improve compatibility.
+Initializing gl2 renderer:
+primary display bounds: (0, 0, 1920, 1080)
+swap interval: 1 frames
+Windowed mode.
+Vendor: "b'Mesa'"
+Renderer: b'llvmpipe (LLVM 20.1.2, 256 bits)'
+Version: b'4.5 (Compatibility Profile) Mesa 25.2.8-0ubuntu0.24.04.1'
+Display Info: None
+Screen sizes: virtual=(1024, 576) physical=(1024, 576) drawable=(1024, 576)
+Could not open 'cache/shaders.txt':
+Maximum texture size: 4096x4096

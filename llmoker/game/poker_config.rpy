@@ -31,7 +31,7 @@ init python:
         메뉴에 들어올 때마다 호출되지만 `if_changed=True` 덕분에 불필요한 재시작은 피한다.
         """
 
-        renpy.music.play("audio/main.flac", channel="music", loop=True, if_changed=True)
+        renpy.music.play("audio/main.ogg", channel="music", loop=True, if_changed=True)
 
     def play_poker_game_music():
         """
@@ -39,7 +39,7 @@ init python:
         세이브를 불러오거나 게임 화면으로 복귀할 때도 같은 함수로 재생 상태를 다시 맞춘다.
         """
 
-        renpy.music.play("audio/game.flac", channel="music", loop=True, if_changed=True)
+        renpy.music.play("audio/game.ogg", channel="music", loop=True, if_changed=True)
 
 default poker_backend_config = None
 default poker_bot_mode = "llm_npc"

@@ -5,10 +5,13 @@ define system_speaker = Character("시스템")
 
 label splashscreen:
     $ renpy.music.stop(channel="music")
+    $ renpy.music.stop(channel="sound")
     $ begin_llm_npc_prewarm()
     $ finish_llm_npc_prewarm()
 
-    $ renpy.movie_cutscene("gui/logo.webm", delay=None, loops=0, stop_music=False)
+    $ renpy.music.play("audio/logo.ogg", channel="sound", loop=False)
+    $ renpy.movie_cutscene("gui/logo_silent.webm", delay=None, loops=0, stop_music=False)
+    $ renpy.music.stop(channel="sound")
 
     scene black
     with Dissolve(0.12)
@@ -28,13 +31,17 @@ label splashscreen:
     hide splash_notice
     pause 0.22
 
-    $ renpy.movie_cutscene("gui/intro_with_audio.webm", delay=None, loops=0, stop_music=False)
+    $ renpy.music.play("audio/intro.ogg", channel="sound", loop=False)
+    $ renpy.movie_cutscene("gui/intro.webm", delay=None, loops=0, stop_music=False)
+    $ renpy.music.stop(channel="sound")
 
     scene black
     with Dissolve(0.35)
     pause 0.45
 
-    $ renpy.movie_cutscene("gui/openingcinema.webm", delay=None, loops=0, stop_music=False)
+    $ renpy.music.play("audio/opening.ogg", channel="sound", loop=False)
+    $ renpy.movie_cutscene("gui/openingcinema_silent.webm", delay=None, loops=0, stop_music=False)
+    $ renpy.music.stop(channel="sound")
 
     scene llmoker_main_menu_video
     with Dissolve(0.35)
