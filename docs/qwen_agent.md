@@ -30,7 +30,8 @@
 - `runtime.py`
   - 모델 로드, Qwen-Agent `FnCallAgent`, 결과 파싱
   - 행동/교체/회고는 tool calling 경로를 쓴다.
-  - 회고는 자유문장 3개를 바로 뽑지 않고, 정책 슬롯 JSON을 먼저 고른 뒤 코드가 전략 문장으로 바꾼다.
+  - 회고는 `short_term`, `long_term`, `strategy_focus`를 LLM이 직접 작성한다.
+  - 런타임은 역할 용어와 필수 필드만 정규화하고, `policy_loop.py`가 공개 사실 기준으로 후검증한다.
 - `tools.py`
   - `get_public_state`, `get_memory`, `get_recent_log`, `get_round_summary`
 - `tasks.py`
@@ -73,5 +74,8 @@
 - 정책 회고는 라운드 종료 뒤 한 번만 생성한다.
 - `policy_loop.py`는 회고 결과가 승패, 족보, 폴드 종료 여부와 충돌하면 저장하지 않는다.
 - 베팅이 없는 상태에서는 `fold`를 합법 행동으로 주지 않는다.
+- 플레이어와 사야는 같은 기준으로 행동 공간이 열린다.
+  - `to_call == 0`이면 `check`, `bet`
+  - `to_call > 0`이면 `fold`, `call`, `raise`
 - 즉 Qwen 런타임은 행동, 카드 교체, 회고를 처리한다.
 - 행동과 카드 교체는 저장된 회고를 읽어 다음 판단에 반영한다.

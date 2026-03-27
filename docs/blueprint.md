@@ -3,7 +3,7 @@
 ## 1. 프로젝트 개요
 
 Ren'Py 런타임 구조와 `vendor/` 사용 이유는 [renpy_engine.md](docs/renpy_engine.md)에 별도로 정리한다.
-대사 이벤트 훅과 현재 LLM 대사 연결 구조는 [dialogue_system.md](docs/dialogue_system.md)에 별도로 정리한다.
+나레이션 이벤트 훅과 현재 화면 출력 구조는 [dialogue_system.md](docs/dialogue_system.md)에 별도로 정리한다.
 현재 LLM NPC 연결 방식과 `Qwen3-4B-Instruct-2507` 기본 모델 사용 구조는 [llm_npc_setup.md](docs/llm_npc_setup.md)에 별도로 정리한다.
 배포용 서빙 구조와 `vLLM`에서 `transformers`로 바꾼 이유는 [serving.md](docs/serving.md)에 별도로 정리한다.
 `Qwen-Agent` 레이어의 파일 역할과 폴더 구조 이유는 [qwen_agent.md](docs/qwen_agent.md)에 별도로 정리한다.
@@ -41,7 +41,7 @@ LLM NPC 설계의 핵심 제약은 아래와 같다.
 - LLM NPC는 플레이어의 손패를 볼 수 없다.
 - LLM NPC와 플레이어가 공통으로 보는 정보는 공개 베팅/체크/레이즈/폴드/카드 교체 수 같은 공개 행동 정보뿐이다.
 - LLM NPC는 결과와 피드백을 바탕으로 in-context reinforcement learning 방식으로 행동 정책을 수정할 수 있다.
-- 이때 라운드 회고와 다음 전략 초점도 LLM이 직접 생성해야 한다. 규칙 기반 회고는 `스크립트봇` 경로에만 남긴다.
+- 이때 라운드 회고와 다음 전략 초점도 LLM이 직접 생성해야 한다.
 
 ## 1.1 현재 구현 요약
 
@@ -71,7 +71,7 @@ LLM NPC 설계의 핵심 제약은 아래와 같다.
 - 스크립트봇과 LLM NPC 전환 지원
 - LLM 행동 선택, 카드 교체, 회고 생성 연결
 - 라운드 종료 후 정책 피드백과 다음 전략 초점도 LLM이 생성
-- 위 네 흐름은 게임 레벨 태스크 네 가지로 분리해 유지한다
+- 위 세 흐름은 게임 레벨 태스크 세 가지로 분리해 유지한다
 - 공개 로그와 기억은 임의 길이 자르기 없이 전달한다
 - `runtime.py`는 transformers로 모델을 직접 로드하고, 그 위에 `Qwen-Agent FnCallAgent`를 올려 행동/교체/회고를 처리한다
 - 화면 문장은 `poker_dialogue.rpy`가 행동/단계 시스템 나레이션으로만 출력한다.
@@ -231,7 +231,7 @@ LLMoker/
 - `poker_ui.rpy`
   - 카드 선택, 베팅 버튼, 로그 표시, 결과창
 - `poker_dialogue.rpy`
-  - 캐릭터 대사, 표정, 블러프 반응, 관계도 이벤트
+  - 행동 요약과 단계 시스템 나레이션
 - `poker_config.rpy`
   - 스택 크기, 앤티, 모델 설정, 디버그 옵션
 
@@ -365,7 +365,7 @@ llmoker/models/llm/llama-3.1-8b-instruct/
 - 프로그램 시작 직후 `game/script.rpy`의 splashscreen에서 런타임 예열을 시작해, 미니게임 진입 뒤 첫 턴 지연을 줄인다.
 - Ren'Py 3.9와 `.venv` 3.11 ABI가 다르므로, 모델 실행은 Python 3.11 런타임 프로세스에서 수행한다.
 - 디바이스 힌트는 `auto`를 기본으로 두고, CUDA가 보일 때만 GPU를 사용한다.
-- 행동, 드로우, 대사, 정책 회고는 모두 tool calling 형식으로 `get_public_state`, `get_memory`, `get_recent_log`, `get_round_summary`를 조회할 수 있어야 한다.
+- 행동, 드로우, 정책 회고는 모두 tool calling 형식으로 `get_public_state`, `get_memory`, `get_recent_log`, `get_round_summary`를 조회할 수 있어야 한다.
 - 이 외부 런타임 구조는 나중에 TTS를 붙일 때도 확장 지점이 된다. 추후 `runtime.py`가 `voice_text`, `emotion`, `tts_payload` 같은 응답 필드를 추가하고, Ren'Py는 그 결과만 받아 오디오 계층으로 넘길 수 있다.
 - 게임 UI에서는 LLM 백엔드를 따로 고르지 않는다.
 - 로컬 Qwen 런타임이 기동하지 않거나 모델 로딩에 실패하면 LLM NPC는 실패 상태를 그대로 보여준다.
@@ -379,38 +379,31 @@ llmoker/models/llm/llama-3.1-8b-instruct/
 - 행동 선택 프롬프트: `build_action_prompt(...)`
 - 정책 피드백 프롬프트: `build_policy_feedback_prompt(...)`
 - 카드 교체 프롬프트: `build_draw_prompt(...)`
-  - 최근 로그를 날것으로 붙이지 않고 `상대가 체크했다`, `이제 드로우를 앞두고 있다` 같은 사건 문장으로 다시 써서 사용한다.
-  - `round_end`, `match_end`에서는 승패 결과를 바탕으로 기쁨/우쭐함/분함 같은 감정 힌트를 별도로 준다.
+  - 최근 로그와 최근 전략 피드백, 장기 기억을 함께 넣어 사용한다.
 
 현재 구현 상태는 아래와 같이 구분한다.
 
 - 행동 선택 프롬프트는 LLM NPC 행동 선택 경로에 연결되어 있다.
 - 정책 피드백 프롬프트는 라운드 종료 후 ICRL 메모리 갱신 경로에 연결되어 있다.
-- 대사 생성 프롬프트는 대사 이벤트 호출부까지 연결되어 있다.
 - 행동 선택과 카드 교체 판단은 공개 로그와 자기 손패만 사용한다.
 - 정책 피드백 생성도 공개 로그와 라운드 결과만 사용한다.
-- 대사 생성도 공개 로그와 결과 요약만 사용한다.
-- 대사 생성 프롬프트는 플레이어에게 직접 말하는 2인칭 RP 대사 형식으로 강하게 제한한다.
 - 플레이어 손패 정보는 LLM NPC 프롬프트에 포함하지 않는다.
 - 게임 UI에는 비공개 정보를 숨기되, 터미널 디버그 로그에는 LLM NPC 손패와 행동 판단 과정을 출력해 개발 중 검증할 수 있게 한다.
 
 즉, 모델 호출 구조는 항상 `models/llm/` + `backend/` 조합이다.
 
-### 4.4 캐릭터 페르소나와 프롬프트는 어디에 두는가
+### 4.4 프롬프트는 어디에 두는가
 
 이것도 모델과 섞으면 안 된다.
 
-- 캐릭터 프로필: `llmoker/data/personas/`
-- 시스템 프롬프트 템플릿: `llmoker/data/prompts/`
-- 상황별 대사 템플릿: `llmoker/data/prompts/dialogue/`
+- 시스템 프롬프트 템플릿: `llmoker/backend/llm/prompts.py`
+- 태스크별 payload 조립: `llmoker/backend/llm/tasks.py`
 
 예시:
 
 ```text
-llmoker/data/personas/reina.json
-llmoker/data/personas/yuna.json
-llmoker/data/prompts/poker_action_system.txt
-llmoker/data/prompts/dialogue/bluff_win.txt
+llmoker/backend/llm/prompts.py
+llmoker/backend/llm/tasks.py
 ```
 
 ### 4.5 기억은 어디에 두는가
@@ -508,7 +501,7 @@ PyTorch는 현재 `cu130` 기준으로 설치한다.
 - `game/*.rpy`
   - 화면 표시
   - 사용자 입력 처리
-  - 캐릭터 대사 표시
+  - 행동/단계 나레이션 표시
 - `backend/*`
   - 실제 포커 계산
   - LLM 추론 호출
@@ -624,8 +617,8 @@ def example(arg1, arg2):
   - 드로우
   - 두 번째 베팅
   - 쇼다운
-- LLM 경로는 행동 선택, 카드 교체 판단, 대사 생성까지 실제 연결된 상태를 유지한다.
-- `LLM NPC` 모드에서는 실패 시 합법 행동이나 스크립트 대사로 숨기지 않고, 오류를 드러내서 먼저 해결하게 한다.
+- LLM 경로는 행동 선택, 카드 교체 판단, 정책 회고까지 실제 연결된 상태를 유지한다.
+- `LLM NPC` 모드에서는 실패 시 합법 행동이나 스크립트 경로로 숨기지 않고, 오류를 드러내서 먼저 해결하게 한다.
 - 매치 시작 전처럼 아직 손패가 배분되지 않은 상태도 엔진과 프롬프트가 안전하게 처리해야 한다.
 
 ### 5.8 폴더 구조 준수 규칙
@@ -669,7 +662,7 @@ def example(arg1, arg2):
 - 각 플레이어의 핸드가 5장이라 상태 표현이 간결하다.
 - 드로우 전/후, 두 번의 베팅 라운드만 있으면 된다.
 - 정보 은닉이 존재하므로 추론, 확률, 블러핑이 살아난다.
-- LLM이 `행동 + 이유 + 캐릭터 대사`를 동시에 생성하기 좋다.
+- LLM이 `행동 + 이유 + 회고`를 함께 실험하기 좋다.
 
 즉, 룰은 단순하지만 전략성은 남아 있어서 LLM 실험과 게임 연출을 같이 보여주기 좋다.
 
@@ -912,7 +905,7 @@ def example(arg1, arg2):
 - 쇼다운 판정과 타이브레이커
 - 스크립트봇과 LLM NPC 전환
 - 공개 로그 기반 ICRL 메모리 루프
-- LLM 대사 생성과 스크립트 폴백
+- 행동/드로우/회고를 묶는 LLM 런타임과 시스템 나레이션 레이어
 
 즉, 현재 코드베이스는 확장 가능한 현재 기준 구현체다.
 

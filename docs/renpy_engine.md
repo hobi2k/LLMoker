@@ -236,7 +236,7 @@ llmoker/
 - `backend/llm/runtime.py`
   - 실제 게임에서 사용한다.
   - Python 3.11에서 `Qwen-Agent + transformers`를 직접 로드한다.
-  - 행동 선택, 카드 교체, 대사 생성, 라운드 회고 요청을 직접 처리한다.
+  - 행동 선택, 카드 교체, 라운드 회고 요청을 직접 처리한다.
 - `scripts/run_match.py`
   - 실제 Ren'Py 게임 런타임에서는 사용하지 않는다.
   - 개발자가 포커 엔진 규칙과 자동 대전을 빠르게 점검하는 CLI 테스트용 스크립트다.
