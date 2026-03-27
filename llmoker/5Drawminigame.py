@@ -27,6 +27,7 @@
 from __future__ import print_function, absolute_import
 
 import os
+import subprocess
 import sys
 import warnings
 
@@ -277,9 +278,51 @@ def predefined_searchpath(commondir):
 
 android = ("ANDROID_PRIVATE" in os.environ)
 
+
+def _run_windows_llm_bootstrap(renpy_base):
+    """
+    Windows에서는 GUI 시작 전에 콘솔 부트스트랩으로 LLM 준비를 끝낸다.
+    """
+
+    if os.name != "nt":
+        return
+
+    if os.environ.get("LLMOKER_WINDOWS_BOOTSTRAPPED") == "1":
+        return
+
+    sys.path.append(renpy_base)
+
+    try:
+        from backend.llm import bootstrap_console
+    except Exception:
+        return
+
+    if not bootstrap_console.needs_bootstrap():
+        return
+
+    console_python = os.path.join(renpy_base, "lib", "py3-windows-x86_64", "python.exe")
+    if not os.path.isfile(console_python):
+        return
+
+    env = os.environ.copy()
+    env["PYTHONPATH"] = renpy_base
+    env["LLMOKER_WINDOWS_BOOTSTRAPPED"] = "1"
+    creationflags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
+    command = [console_python, "-m", "backend.llm.bootstrap_console"]
+    completed = subprocess.call(
+        command,
+        cwd=renpy_base,
+        env=env,
+        creationflags=creationflags,
+    )
+    if completed != 0:
+        raise SystemExit(completed)
+
 def main():
 
     renpy_base = path_to_renpy_base()
+
+    _run_windows_llm_bootstrap(renpy_base)
 
     sys.path.append(renpy_base)
 

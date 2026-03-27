@@ -46,11 +46,13 @@ class QwenRuntimeClient:
         model_name,
         runtime_python,
         device,
+        verbose_bootstrap=False,
     ):
         self.model_path = model_path
         self.model_name = model_name
         self.runtime_python = runtime_python
         self.device = device
+        self.verbose_bootstrap = verbose_bootstrap
         self.last_status = "LLM 런타임이 아직 시작되지 않았습니다."
 
     def configure(
@@ -173,7 +175,11 @@ class QwenRuntimeClient:
         archive_path = ROOT_DIR / "data" / "logs" / f"python-{WINDOWS_EMBED_VERSION}-embed-amd64.zip"
         try:
             if not archive_path.is_file():
+                self._log_bootstrap("Windows 임베디드 Python 3.11을 다운로드합니다.")
                 self._download_file(WINDOWS_EMBED_URL, archive_path)
+            else:
+                self._log_bootstrap("기존 Windows 임베디드 Python 아카이브를 사용합니다.")
+            self._log_bootstrap("Windows 임베디드 Python을 준비합니다.")
             runtime_dir.mkdir(parents=True, exist_ok=True)
             with zipfile.ZipFile(str(archive_path), "r") as archive:
                 archive.extractall(str(runtime_dir))
@@ -216,15 +222,21 @@ class QwenRuntimeClient:
                 return candidate
         return None
 
+    def _log_bootstrap(self, message):
+        if self.verbose_bootstrap:
+            print("[LLMoker][BOOTSTRAP] %s" % message, flush=True)
+
     def _run_bootstrap_command(self, command):
         env = os.environ.copy()
         env["PYTHONPATH"] = str(ROOT_DIR)
+        stdout = None if self.verbose_bootstrap else subprocess.DEVNULL
+        stderr = None if self.verbose_bootstrap else subprocess.DEVNULL
         subprocess.check_call(
             command,
             cwd=str(ROOT_DIR),
             env=env,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=stdout,
+            stderr=stderr,
         )
 
     def _ensure_runtime_virtualenv(self):
@@ -242,6 +254,7 @@ class QwenRuntimeClient:
             return False
 
         try:
+            self._log_bootstrap("Linux 런타임용 가상환경을 생성합니다.")
             self._run_bootstrap_command([bootstrap_python, "-m", "venv", str(ROOT_DIR / ".venv")])
         except Exception as exc:
             if os.name == "nt" and os.path.abspath(str(bootstrap_python)) == os.path.abspath(str(ROOT_DIR / "lib" / "py3-windows-x86_64" / "python.exe")):
@@ -272,7 +285,9 @@ class QwenRuntimeClient:
             get_pip_path = ROOT_DIR / "data" / "logs" / "get-pip.py"
             try:
                 if not get_pip_path.is_file():
+                    self._log_bootstrap("get-pip.py를 다운로드합니다.")
                     self._download_file(GET_PIP_URL, get_pip_path)
+                self._log_bootstrap("Windows 런타임에 pip를 설치합니다.")
                 self._run_bootstrap_command([self.runtime_python, str(get_pip_path), "--no-warn-script-location"])
                 return True
             except Exception as exc:
@@ -280,6 +295,7 @@ class QwenRuntimeClient:
                 return False
 
         try:
+            self._log_bootstrap("런타임에 ensurepip를 실행합니다.")
             self._run_bootstrap_command([self.runtime_python, "-m", "ensurepip", "--upgrade"])
             return True
         except Exception as exc:
@@ -315,6 +331,7 @@ class QwenRuntimeClient:
             self.__class__._dependencies_ready.add(dependency_key)
             return True
         try:
+            self._log_bootstrap("LLM 런타임 의존성을 설치합니다. 시간이 걸릴 수 있습니다.")
             self._run_bootstrap_command([self.runtime_python, "-m", "pip", "install", "-r", str(REQUIREMENTS_PATH)])
             self.__class__._dependencies_ready.add(dependency_key)
             return True
@@ -330,6 +347,7 @@ class QwenRuntimeClient:
             self.__class__._models_ready.add(model_key)
             return True
         try:
+            self._log_bootstrap("기본 Qwen 모델을 준비합니다. 다운로드가 길어질 수 있습니다.")
             self._run_bootstrap_command([self.runtime_python, "-m", "backend.llm.model_bootstrap"])
         except Exception as exc:
             self.last_status = f"LLM 모델 다운로드 실패: {exc}"
@@ -394,6 +412,30 @@ class QwenRuntimeClient:
         if not payload:
             return False
         return payload.get("status") == "ready" and payload.get("model_name") == self.model_name
+
+    def needs_bootstrap(self):
+        """
+        런타임 준비 작업이 남아 있는지 판정한다.
+        """
+
+        if self.is_running():
+            return False
+
+        runtime_python = self._venv_python_path()
+        if not os.path.isfile(runtime_python):
+            return True
+
+        original_runtime_python = self.runtime_python
+        try:
+            self.runtime_python = runtime_python
+            if not self._has_required_runtime_packages():
+                return True
+            if not self.has_model_files():
+                return True
+        finally:
+            self.runtime_python = original_runtime_python
+
+        return True
 
     def _read_pipe_line(self, timeout_seconds):
         """
@@ -469,6 +511,7 @@ class QwenRuntimeClient:
 
         process = self._process
         if process is None or process.poll() is not None or self._signature != self.signature():
+            self._log_bootstrap("Qwen 런타임 프로세스를 시작합니다.")
             self.stop()
             process = self.launch()
             self.__class__._process = process
