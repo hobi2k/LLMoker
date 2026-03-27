@@ -2,6 +2,9 @@
 __pycache__/
 *.py[codz]
 *$py.class
+!llmoker/vendor/windows/**/*.pyc
+!llmoker/vendor/windows/**/*.pyd
+!llmoker/vendor/windows/**/*.dll
 
 # C extensions
 *.so
