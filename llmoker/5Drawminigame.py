@@ -318,6 +318,14 @@ def _run_windows_llm_bootstrap(renpy_base):
     if completed != 0:
         raise SystemExit(completed)
 
+    relaunched_env = os.environ.copy()
+    relaunched_env["LLMOKER_WINDOWS_BOOTSTRAPPED"] = "1"
+
+    current_executable = os.path.abspath(sys.argv[0])
+    if os.path.isfile(current_executable) and current_executable.lower().endswith(".exe"):
+        subprocess.Popen([current_executable] + sys.argv[1:], cwd=renpy_base, env=relaunched_env)
+        raise SystemExit(0)
+
 def main():
 
     renpy_base = path_to_renpy_base()

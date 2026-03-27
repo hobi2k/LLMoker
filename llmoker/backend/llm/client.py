@@ -435,7 +435,7 @@ class QwenRuntimeClient:
         finally:
             self.runtime_python = original_runtime_python
 
-        return True
+        return False
 
     def _read_pipe_line(self, timeout_seconds):
         """
