@@ -9,6 +9,8 @@ import select
 import signal
 import subprocess
 import sys
+import urllib.request
+import zipfile
 from pathlib import Path
 
 
@@ -17,6 +19,9 @@ LOG_DIR = ROOT_DIR / "data" / "logs"
 RUNTIME_LOG_PATH = LOG_DIR / "qwen_runtime.log"
 RUNTIME_PID_PATH = LOG_DIR / "qwen_runtime.pid"
 REQUIREMENTS_PATH = ROOT_DIR.parent / "requirements.txt"
+WINDOWS_EMBED_VERSION = "3.11.9"
+WINDOWS_EMBED_URL = f"https://www.python.org/ftp/python/{WINDOWS_EMBED_VERSION}/python-{WINDOWS_EMBED_VERSION}-embed-amd64.zip"
+GET_PIP_URL = "https://bootstrap.pypa.io/get-pip.py"
 
 
 class QwenRuntimeClient:
@@ -93,17 +98,74 @@ class QwenRuntimeClient:
 
     def _venv_python_path(self):
         if os.name == "nt":
-            return str(ROOT_DIR / ".venv" / "Scripts" / "python.exe")
+            return str(ROOT_DIR / ".runtime" / "py311-windows-x86_64" / "python.exe")
         return str(ROOT_DIR / ".venv" / "bin" / "python")
 
+    def _windows_runtime_dir(self):
+        return ROOT_DIR / ".runtime" / "py311-windows-x86_64"
+
+    def _download_file(self, url, destination):
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with urllib.request.urlopen(url) as response, open(destination, "wb") as handle:
+            handle.write(response.read())
+
+    def _write_windows_pth(self, runtime_dir):
+        pth_path = runtime_dir / "python311._pth"
+        pth_path.write_text(
+            "\n".join(
+                [
+                    "python311.zip",
+                    ".",
+                    "Lib",
+                    "Lib\\site-packages",
+                    "import site",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+    def _ensure_windows_embedded_runtime(self):
+        runtime_dir = self._windows_runtime_dir()
+        python_path = runtime_dir / "python.exe"
+        if python_path.is_file():
+            self.runtime_python = str(python_path)
+            return True
+
+        archive_path = ROOT_DIR / "data" / "logs" / f"python-{WINDOWS_EMBED_VERSION}-embed-amd64.zip"
+        try:
+            if not archive_path.is_file():
+                self._download_file(WINDOWS_EMBED_URL, archive_path)
+            runtime_dir.mkdir(parents=True, exist_ok=True)
+            with zipfile.ZipFile(str(archive_path), "r") as archive:
+                archive.extractall(str(runtime_dir))
+            (runtime_dir / "Lib" / "site-packages").mkdir(parents=True, exist_ok=True)
+            self._write_windows_pth(runtime_dir)
+        except Exception as exc:
+            self.last_status = f"Windows 내장 Python 준비 실패: {exc}"
+            return False
+
+        if not python_path.is_file():
+            self.last_status = "Windows 내장 Python 준비 후 python.exe를 찾지 못했습니다."
+            return False
+
+        self.runtime_python = str(python_path)
+        return True
+
     def _bootstrap_python_candidates(self):
-        candidates = [self.runtime_python]
         if os.name == "nt":
-            candidates.append(str(ROOT_DIR / "lib" / "py3-windows-x86_64" / "python.exe"))
-            candidates.append("python")
+            candidates = [
+                self.runtime_python,
+                "py",
+                "python",
+                str(ROOT_DIR / "lib" / "py3-windows-x86_64" / "python.exe"),
+            ]
         else:
-            candidates.append(str(ROOT_DIR / "lib" / "py3-linux-x86_64" / "python"))
-            candidates.append("python3")
+            candidates = [
+                self.runtime_python,
+                str(ROOT_DIR / "lib" / "py3-linux-x86_64" / "python"),
+                "python3",
+            ]
         return candidates
 
     def _pick_bootstrap_python(self):
@@ -128,6 +190,9 @@ class QwenRuntimeClient:
         )
 
     def _ensure_runtime_virtualenv(self):
+        if os.name == "nt":
+            return self._ensure_windows_embedded_runtime()
+
         venv_python = self._venv_python_path()
         if os.path.isfile(venv_python):
             self.runtime_python = venv_python
@@ -141,7 +206,14 @@ class QwenRuntimeClient:
         try:
             self._run_bootstrap_command([bootstrap_python, "-m", "venv", str(ROOT_DIR / ".venv")])
         except Exception as exc:
-            self.last_status = f"LLM 가상환경 생성 실패: {exc}"
+            if os.name == "nt" and os.path.abspath(str(bootstrap_python)) == os.path.abspath(str(ROOT_DIR / "lib" / "py3-windows-x86_64" / "python.exe")):
+                self.last_status = (
+                    "LLM 가상환경 생성 실패: Ren'Py 번들 Windows Python으로는 venv를 만들 수 없습니다. "
+                    "Windows에서는 시스템 Python 3.11이 먼저 설치돼 있어야 합니다. "
+                    f"원본 오류: {exc}"
+                )
+            else:
+                self.last_status = f"LLM 가상환경 생성 실패: {exc}"
             return False
 
         if not os.path.isfile(venv_python):
@@ -157,6 +229,17 @@ class QwenRuntimeClient:
             return True
         except Exception:
             pass
+
+        if os.name == "nt":
+            get_pip_path = ROOT_DIR / "data" / "logs" / "get-pip.py"
+            try:
+                if not get_pip_path.is_file():
+                    self._download_file(GET_PIP_URL, get_pip_path)
+                self._run_bootstrap_command([self.runtime_python, str(get_pip_path), "--no-warn-script-location"])
+                return True
+            except Exception as exc:
+                self.last_status = f"pip 준비 실패: {exc}"
+                return False
 
         try:
             self._run_bootstrap_command([self.runtime_python, "-m", "ensurepip", "--upgrade"])
@@ -328,11 +411,6 @@ class QwenRuntimeClient:
         Returns:
             준비 성공 여부다.
         """
-
-        if self.is_running():
-            self.last_status = "Transformers 런타임 준비 완료"
-            self._signature = self.signature()
-            return True
 
         if self.is_running():
             self.last_status = "Transformers 런타임 준비 완료"

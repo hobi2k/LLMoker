@@ -40,7 +40,8 @@ Steam 같은 일반 유저 배포 기준에서는 `vLLM`보다 `transformers`가
 1. `llmoker/5Drawminigame.sh`
    - 모델 다운로드만 먼저 확인한다.
 2. `llmoker/backend/llm/client.py`
-   - 게임 프로세스 안에서 Python 3.11 `.venv` 런타임을 자식 프로세스로 띄운다.
+   - 게임 프로세스 안에서 Python 3.11 런타임을 자식 프로세스로 띄운다.
+   - Linux는 `llmoker/.venv`를, Windows는 `llmoker/.runtime/py311-windows-x86_64` 임베디드 런타임을 자동 준비한다.
    - 요청은 `stdin`, 응답은 `stdout`으로 주고받는다.
 3. `llmoker/backend/llm/runtime.py`
    - `transformers`로 토크나이저와 모델을 직접 로드한다.
@@ -51,7 +52,7 @@ Steam 같은 일반 유저 배포 기준에서는 `vLLM`보다 `transformers`가
    - 포커 엔진이 쓰는 상위 어댑터다.
    - 행동, 카드 교체, 회고 요청을 런타임으로 보낸다.
 
-즉 현재 구조는 `Ren'Py 3.9`와 `.venv 3.11` ABI 차이를 넘기기 위한 최소 외부 런타임만 유지하되, HTTP 서버는 쓰지 않는다.
+즉 현재 구조는 `Ren'Py 3.9`와 별도 `Python 3.11` 런타임의 ABI 차이를 넘기기 위한 최소 외부 런타임만 유지하되, HTTP 서버는 쓰지 않는다.
 
 ## 4. 현재 런타임이 처리하는 작업
 
@@ -75,6 +76,7 @@ Steam 같은 일반 유저 배포 기준에서는 `vLLM`보다 `transformers`가
 ## 6. 배포 관점 주의사항
 
 - 일반 유저 배포판은 `transformers` 기준으로 유지한다.
+- Windows 배포판은 외부 Python 설치를 요구하지 않고 프로젝트 내부 `.runtime/py311-windows-x86_64`를 자동 준비하는 방향으로 유지한다.
 - `vLLM`은 실험용이나 개인 환경 최적화용으로만 다시 검토한다.
 - 로컬 모델이 없으면 `5Drawminigame.sh`가 먼저 다운로드를 시도한다.
 - 새 게임 시작 시 기억은 초기화되고, 세이브를 저장했을 때만 기억 스냅샷이 같이 복원된다.

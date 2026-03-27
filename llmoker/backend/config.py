@@ -56,6 +56,7 @@ def load_backend_config(base_dir):
     llm_model_name = os.environ.get("LLM_MODEL_NAME", default_model_name)
     if os.name == "nt":
         runtime_candidates = [
+            os.path.join(base_dir, ".runtime", "py311-windows-x86_64", "python.exe"),
             os.path.join(base_dir, ".venv", "Scripts", "python.exe"),
             os.path.join(base_dir, "lib", "py3-windows-x86_64", "python.exe"),
             "python",

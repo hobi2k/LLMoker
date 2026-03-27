@@ -8,7 +8,6 @@ import importlib
 import os
 import subprocess
 import sys
-import ensurepip
 
 
 MODEL_REPO_ID = "Qwen/Qwen3-4B-Instruct-2507"
@@ -67,7 +66,14 @@ def ensure_huggingface_hub() -> None:
     try:
         importlib.import_module("pip")
     except ModuleNotFoundError:
-        ensurepip.bootstrap(upgrade=True)
+        try:
+            import ensurepip
+
+            ensurepip.bootstrap(upgrade=True)
+        except ModuleNotFoundError as exc:
+            raise RuntimeError(
+                "pip이 준비되지 않았습니다. 런타임 부트스트랩 단계에서 pip 설치가 먼저 완료돼야 합니다."
+            ) from exc
 
     subprocess.check_call(
         [

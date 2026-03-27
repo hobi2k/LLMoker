@@ -142,6 +142,7 @@ celerybeat.pid
 .env
 .envrc
 .venv
+.runtime/
 env/
 venv/
 ENV/
@@ -211,6 +212,8 @@ cython_debug/
 checkpoints/
 models/llm/
 weights/
+llmoker/data/logs/get-pip.py
+llmoker/data/logs/python-*-embed-amd64.zip
 .cursorignore
 .cursorindexingignore
 
